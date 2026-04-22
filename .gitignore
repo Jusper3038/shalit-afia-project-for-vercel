@@ -16,6 +16,7 @@ dist-ssr
 .lovable/
 .workspace/
 .git.broken-reference.txt
+supabase/.temp/
 
 # Editor directories and files
 .vscode/*
