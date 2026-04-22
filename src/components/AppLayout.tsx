@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { Suspense, lazy, useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
 import { Button } from "@/components/ui/button";
@@ -6,7 +6,6 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { toast } from "sonner";
-import ClinicAssistant from "@/components/ClinicAssistant";
 import {
   LayoutDashboard,
   Pill,
@@ -21,6 +20,8 @@ import {
   Sparkles,
   ShieldCheck,
 } from "lucide-react";
+
+const ClinicAssistant = lazy(() => import("@/components/ClinicAssistant"));
 
 const navItems = [
   { to: "/dashboard", label: "Dashboard", icon: LayoutDashboard, ownerOnly: true },
@@ -232,7 +233,9 @@ const AppLayout = ({ children }: { children: React.ReactNode }) => {
           </form>
         </DialogContent>
       </Dialog>
-      <ClinicAssistant />
+      <Suspense fallback={null}>
+        <ClinicAssistant />
+      </Suspense>
     </div>
   );
 };
