@@ -149,6 +149,7 @@ export type Database = {
           created_at: string
           email: string
           id: string
+          minimum_profit_retention_percentage: number
           name: string
           updated_at: string
           user_id: string
@@ -158,6 +159,7 @@ export type Database = {
           created_at?: string
           email?: string
           id?: string
+          minimum_profit_retention_percentage?: number
           name?: string
           updated_at?: string
           user_id: string
@@ -167,6 +169,7 @@ export type Database = {
           created_at?: string
           email?: string
           id?: string
+          minimum_profit_retention_percentage?: number
           name?: string
           updated_at?: string
           user_id?: string
@@ -177,6 +180,8 @@ export type Database = {
         Row: {
           created_at: string
           date: string
+          discount_amount: number
+          discount_percentage: number
           drug_id: string | null
           id: string
           patient_id: string | null
@@ -187,12 +192,15 @@ export type Database = {
           sale_year: number
           total_cost: number
           unit_buying_price: number
+          unit_list_price: number
           unit_selling_price: number
           user_id: string
         }
         Insert: {
           created_at?: string
           date?: string
+          discount_amount?: number
+          discount_percentage?: number
           drug_id?: string | null
           id?: string
           patient_id?: string | null
@@ -203,12 +211,15 @@ export type Database = {
           sale_year?: number
           total_cost?: number
           unit_buying_price?: number
+          unit_list_price?: number
           unit_selling_price?: number
           user_id: string
         }
         Update: {
           created_at?: string
           date?: string
+          discount_amount?: number
+          discount_percentage?: number
           drug_id?: string | null
           id?: string
           patient_id?: string | null
@@ -219,6 +230,7 @@ export type Database = {
           sale_year?: number
           total_cost?: number
           unit_buying_price?: number
+          unit_list_price?: number
           unit_selling_price?: number
           user_id?: string
         }
@@ -278,6 +290,8 @@ export type Database = {
         Returns: {
           created_at: string
           date: string
+          discount_amount: number
+          discount_percentage: number
           drug_id: string | null
           id: string
           patient_id: string | null
@@ -288,6 +302,7 @@ export type Database = {
           sale_year: number
           total_cost: number
           unit_buying_price: number
+          unit_list_price: number
           unit_selling_price: number
           user_id: string
         }[]

@@ -16,6 +16,7 @@ import { toast } from "sonner";
 import { Check, ChevronsUpDown, Download, Plus, Receipt, Trash2 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import type { Tables } from "@/integrations/supabase/types";
+import { clampPercent, getDiscountedUnitPrice, getMaxDiscountPercentageForDrug, getProtectedUnitPrice } from "@/lib/discounts";
 import { getExpiryLabel, isExpiredDrug, isExpiringSoonDrug } from "@/lib/inventory";
 import { downloadReceiptPdf } from "@/lib/pdf-receipt";
 import { formatClinicDateTime } from "@/lib/reporting";
@@ -23,6 +24,7 @@ import { formatClinicDateTime } from "@/lib/reporting";
 type BillItem = {
   itemName: string;
   quantity: number;
+  discountPercentage: number;
 };
 
 type BatchAllocation = {
@@ -55,7 +57,7 @@ type TransactionGroup = {
 };
 
 const BillingPage = () => {
-  const { user, profile } = useAuth();
+  const { user, profile, role } = useAuth();
   const [patients, setPatients] = useState<Tables<"patients">[]>([]);
   const [drugs, setDrugs] = useState<Tables<"drugs">[]>([]);
   const [transactions, setTransactions] = useState<Tables<"transactions">[]>([]);
@@ -65,9 +67,14 @@ const BillingPage = () => {
   const [selectedDrug, setSelectedDrug] = useState("");
   const [drugPickerOpen, setDrugPickerOpen] = useState(false);
   const [quantity, setQuantity] = useState("1");
+  const [discountPercentage, setDiscountPercentage] = useState("0");
   const [billItems, setBillItems] = useState<BillItem[]>([]);
   const [submitting, setSubmitting] = useState(false);
+  const [savingDiscountSettings, setSavingDiscountSettings] = useState(false);
   const [latestReceipt, setLatestReceipt] = useState<ReceiptData | null>(null);
+  const [minimumProfitRetentionPercentage, setMinimumProfitRetentionPercentage] = useState(
+    String(profile?.minimum_profit_retention_percentage ?? 40)
+  );
 
   const fetchAll = async () => {
     if (!user) return;
@@ -83,6 +90,9 @@ const BillingPage = () => {
   };
 
   useEffect(() => { fetchAll(); }, [user]);
+  useEffect(() => {
+    setMinimumProfitRetentionPercentage(String(profile?.minimum_profit_retention_percentage ?? 40));
+  }, [profile?.minimum_profit_retention_percentage]);
 
   const availableDrugs = drugs.filter((d) => d.stock_quantity > 0);
   const billReservedByItem = billItems.reduce<Record<string, number>>((acc, item) => {
@@ -136,6 +146,9 @@ const BillingPage = () => {
 
   const selectedItemSummary = itemSummaries.find((item) => item.itemName === selectedDrug);
   const draftQuantity = parseInt(quantity || "0", 10);
+  const configuredMinimumProfitRetentionPercentage = clampPercent(
+    parseFloat(minimumProfitRetentionPercentage || "40")
+  );
 
   const getDrugById = (drugId: string) => drugs.find((drug) => drug.id === drugId);
   const getPatientById = (patientId: string | null) => patients.find((patient) => patient.id === patientId);
@@ -164,15 +177,59 @@ const BillingPage = () => {
     return remaining > 0 ? null : allocations;
   };
 
-  const draftAllocations = selectedItemSummary ? getBatchAllocations(selectedItemSummary.itemName, draftQuantity) : null;
-  const draftLineTotal = draftAllocations
-    ? draftAllocations.reduce((sum, allocation) => sum + Number(allocation.drug.selling_price) * allocation.quantity, 0)
+  const getMaxDiscountPercentageForItem = (itemName: string, quantityNeeded: number) => {
+    const allocations = getBatchAllocations(itemName, quantityNeeded);
+    if (!allocations || allocations.length === 0) return 0;
+
+    return Math.min(
+      ...allocations.map((allocation) =>
+        getMaxDiscountPercentageForDrug(allocation.drug, configuredMinimumProfitRetentionPercentage)
+      )
+    );
+  };
+
+  const buildDiscountedAllocations = (itemName: string, quantityNeeded: number, requestedDiscountPercentage: number) => {
+    const allocations = getBatchAllocations(itemName, quantityNeeded);
+    if (!allocations) return null;
+
+    const maxAllowedDiscountPercentage = getMaxDiscountPercentageForItem(itemName, quantityNeeded);
+    const appliedDiscountPercentage = Math.min(clampPercent(requestedDiscountPercentage), maxAllowedDiscountPercentage);
+
+    return {
+      allocations,
+      maxAllowedDiscountPercentage,
+      appliedDiscountPercentage,
+      pricedAllocations: allocations.map((allocation) => {
+        const discountedUnitPrice = getDiscountedUnitPrice(
+          allocation.drug,
+          configuredMinimumProfitRetentionPercentage,
+          appliedDiscountPercentage
+        );
+        const protectedUnitPrice = getProtectedUnitPrice(
+          allocation.drug,
+          configuredMinimumProfitRetentionPercentage
+        );
+
+        return {
+          ...allocation,
+          discountedUnitPrice,
+          protectedUnitPrice,
+          lineTotal: discountedUnitPrice * allocation.quantity,
+        };
+      }),
+    };
+  };
+
+  const draftDiscountPercentage = clampPercent(parseFloat(discountPercentage || "0"));
+  const draftPricing = selectedItemSummary ? buildDiscountedAllocations(selectedItemSummary.itemName, draftQuantity, draftDiscountPercentage) : null;
+  const draftLineTotal = draftPricing
+    ? draftPricing.pricedAllocations.reduce((sum, allocation) => sum + allocation.lineTotal, 0)
     : 0;
 
   const billTotal = billItems.reduce((sum, item) => {
-    const allocations = getBatchAllocations(item.itemName, item.quantity);
-    return allocations
-      ? sum + allocations.reduce((lineSum, allocation) => lineSum + Number(allocation.drug.selling_price) * allocation.quantity, 0)
+    const pricing = buildDiscountedAllocations(item.itemName, item.quantity, item.discountPercentage);
+    return pricing
+      ? sum + pricing.pricedAllocations.reduce((lineSum, allocation) => lineSum + allocation.lineTotal, 0)
       : sum;
   }, 0);
 
@@ -193,22 +250,34 @@ const BillingPage = () => {
       return;
     }
 
+    const maxAllowedDiscountPercentage = getMaxDiscountPercentageForItem(selectedItemSummary.itemName, draftQuantity);
+    const appliedDiscountPercentage = Math.min(draftDiscountPercentage, maxAllowedDiscountPercentage);
+
     setBillItems((current) => {
       const existingItem = current.find((item) => item.itemName === selectedItemSummary.itemName);
       if (existingItem) {
         return current.map((item) =>
           item.itemName === selectedItemSummary.itemName
-            ? { ...item, quantity: item.quantity + draftQuantity }
+            ? {
+                ...item,
+                quantity: item.quantity + draftQuantity,
+                discountPercentage: Math.min(item.discountPercentage, getMaxDiscountPercentageForItem(item.itemName, item.quantity + draftQuantity)),
+              }
             : item
         );
       }
 
-      return [...current, { itemName: selectedItemSummary.itemName, quantity: draftQuantity }];
+      return [...current, {
+        itemName: selectedItemSummary.itemName,
+        quantity: draftQuantity,
+        discountPercentage: appliedDiscountPercentage,
+      }];
     });
 
     toast.success(`${selectedItemSummary.itemName} added to bill`);
     setSelectedDrug("");
     setQuantity("1");
+    setDiscountPercentage("0");
   };
 
   const updateBillItemQuantity = (itemName: string, nextValue: string) => {
@@ -229,13 +298,58 @@ const BillingPage = () => {
 
     setBillItems((current) =>
       current.map((item) =>
-        item.itemName === itemName ? { ...item, quantity: nextQuantity } : item
+        item.itemName === itemName
+          ? {
+              ...item,
+              quantity: nextQuantity,
+              discountPercentage: Math.min(item.discountPercentage, getMaxDiscountPercentageForItem(itemName, nextQuantity)),
+            }
+          : item
       )
+    );
+  };
+
+  const updateBillItemDiscount = (itemName: string, nextValue: string) => {
+    const requestedDiscountPercentage = clampPercent(parseFloat(nextValue || "0"));
+
+    setBillItems((current) =>
+      current.map((item) => {
+        if (item.itemName !== itemName) return item;
+        return {
+          ...item,
+          discountPercentage: Math.min(requestedDiscountPercentage, getMaxDiscountPercentageForItem(itemName, item.quantity)),
+        };
+      })
     );
   };
 
   const removeBillItem = (itemName: string) => {
     setBillItems((current) => current.filter((item) => item.itemName !== itemName));
+  };
+
+  const saveDiscountSettings = async () => {
+    if (!user) return;
+    setSavingDiscountSettings(true);
+
+    const { error } = await supabase
+      .from("profiles")
+      .update({
+        minimum_profit_retention_percentage: configuredMinimumProfitRetentionPercentage,
+      })
+      .eq("user_id", user.id);
+
+    setSavingDiscountSettings(false);
+
+    if (error) {
+      toast.error(error.message);
+      return;
+    }
+
+    await logAudit(
+      "Updated discount guardrail",
+      `Minimum profit retained set to ${configuredMinimumProfitRetentionPercentage}%`
+    );
+    toast.success("Discount guardrail updated.");
   };
 
   const buildReceiptMarkup = (receipt: ReceiptData) => {
@@ -379,10 +493,11 @@ const BillingPage = () => {
     setSubmitting(true);
 
     const transactionInputs = billItems.flatMap((item) => {
-      const allocations = getBatchAllocations(item.itemName, item.quantity) ?? [];
-      return allocations.map((allocation) => ({
+      const pricing = buildDiscountedAllocations(item.itemName, item.quantity, item.discountPercentage);
+      return (pricing?.pricedAllocations ?? []).map((allocation) => ({
         drug_id: allocation.drug.id,
         quantity: allocation.quantity,
+        unit_selling_price: allocation.discountedUnitPrice,
       }));
     });
 
@@ -405,7 +520,7 @@ const BillingPage = () => {
       .join(", ");
 
     const receiptLines: ReceiptLine[] = billItems.map((item) => {
-      const allocations = getBatchAllocations(item.itemName, item.quantity) ?? [];
+      const allocations = buildDiscountedAllocations(item.itemName, item.quantity, item.discountPercentage)?.allocations ?? [];
       return {
         itemName: item.itemName,
         quantity: item.quantity,
@@ -450,6 +565,35 @@ const BillingPage = () => {
             </CardTitle>
           </CardHeader>
           <CardContent>
+            {role === "admin" && (
+              <div className="mb-6 rounded-xl border bg-accent/20 p-4">
+                <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
+                  <div className="space-y-1">
+                    <p className="font-medium">Global Discount Guardrail</p>
+                    <p className="text-sm text-muted-foreground">
+                      Keep at least this percentage of the original profit on every sale. This rule applies to all products.
+                    </p>
+                  </div>
+                  <div className="flex flex-col gap-3 sm:flex-row sm:items-end">
+                    <div className="space-y-2">
+                      <Label>Minimum Profit To Keep (%)</Label>
+                      <Input
+                        type="number"
+                        min="0"
+                        max="100"
+                        step="1"
+                        value={minimumProfitRetentionPercentage}
+                        onChange={(e) => setMinimumProfitRetentionPercentage(e.target.value)}
+                        className="w-full sm:w-[200px]"
+                      />
+                    </div>
+                    <Button type="button" onClick={saveDiscountSettings} disabled={savingDiscountSettings}>
+                      {savingDiscountSettings ? "Saving..." : "Save Guardrail"}
+                    </Button>
+                  </div>
+                </div>
+              </div>
+            )}
             <form onSubmit={handleBill} className="space-y-6">
               <div>
                 <Label>Patient</Label>
@@ -464,7 +608,7 @@ const BillingPage = () => {
               </div>
 
               <div className="rounded-lg border p-4">
-                <div className="grid gap-4 md:grid-cols-[minmax(0,1fr)_140px_160px] md:items-end">
+                <div className="grid gap-4 md:grid-cols-[minmax(0,1fr)_120px_140px_160px] md:items-end">
                   <div>
                     <Label>Item</Label>
                     <Popover open={drugPickerOpen} onOpenChange={setDrugPickerOpen}>
@@ -528,6 +672,18 @@ const BillingPage = () => {
                     />
                   </div>
 
+                  <div>
+                    <Label>Discount (%)</Label>
+                    <Input
+                      type="number"
+                      min="0"
+                      max={selectedItemSummary ? getMaxDiscountPercentageForItem(selectedItemSummary.itemName, Math.max(draftQuantity, 1)) : 0}
+                      step="0.01"
+                      value={discountPercentage}
+                      onChange={(e) => setDiscountPercentage(e.target.value)}
+                    />
+                  </div>
+
                   <Button type="button" onClick={addItemToBill} disabled={!selectedDrug}>
                     <Plus className="mr-2 h-4 w-4" />
                     Add Item
@@ -538,9 +694,17 @@ const BillingPage = () => {
                   <div className="mt-4 rounded-md bg-accent p-3">
                     <p className="text-sm text-muted-foreground">Available Stock: {getRemainingStock(selectedItemSummary.itemName)}</p>
                     <p className="text-sm text-muted-foreground">Batches available: {selectedItemSummary.batches.length}</p>
-                    {draftAllocations && draftAllocations.length > 0 && (
-                      <p className={cn("text-sm", isExpiringSoonDrug(draftAllocations[0].drug) ? "text-amber-700 font-medium" : "text-muted-foreground")}>
-                        First batch used: {draftAllocations[0].drug.serial_number || draftAllocations[0].drug.name} | {getExpiryLabel(draftAllocations[0].drug)}
+                    {draftPricing && draftPricing.allocations.length > 0 && (
+                      <p className={cn("text-sm", isExpiringSoonDrug(draftPricing.allocations[0].drug) ? "text-amber-700 font-medium" : "text-muted-foreground")}>
+                        First batch used: {draftPricing.allocations[0].drug.serial_number || draftPricing.allocations[0].drug.name} | {getExpiryLabel(draftPricing.allocations[0].drug)}
+                      </p>
+                    )}
+                    <p className="text-sm text-muted-foreground">
+                      Max allowed discount: {selectedItemSummary ? getMaxDiscountPercentageForItem(selectedItemSummary.itemName, Math.max(draftQuantity, 1)).toFixed(2) : "0.00"}%
+                    </p>
+                    {draftPricing && draftPricing.appliedDiscountPercentage > 0 && (
+                      <p className="text-sm text-muted-foreground">
+                        Applied discount: {draftPricing.appliedDiscountPercentage.toFixed(2)}%
                       </p>
                     )}
                     <p className="text-lg font-bold">Line Total: KSh {draftLineTotal.toLocaleString()}</p>
@@ -564,17 +728,18 @@ const BillingPage = () => {
                 ) : (
                   <div className="space-y-3">
                     {billItems.map((item) => {
-                      const allocations = getBatchAllocations(item.itemName, item.quantity);
-                      if (!allocations) return null;
+                      const pricing = buildDiscountedAllocations(item.itemName, item.quantity, item.discountPercentage);
+                      if (!pricing) return null;
 
-                      const lineTotal = allocations.reduce((sum, allocation) => sum + Number(allocation.drug.selling_price) * allocation.quantity, 0);
+                      const lineTotal = pricing.pricedAllocations.reduce((sum, allocation) => sum + allocation.lineTotal, 0);
+                      const maxAllowedDiscountPercentage = getMaxDiscountPercentageForItem(item.itemName, item.quantity);
 
                       return (
-                        <div key={item.itemName} className="grid gap-3 rounded-lg border p-4 md:grid-cols-[minmax(0,1fr)_120px_140px_48px] md:items-center">
+                        <div key={item.itemName} className="grid gap-3 rounded-lg border p-4 md:grid-cols-[minmax(0,1fr)_110px_120px_140px_48px] md:items-center">
                           <div>
                             <p className="font-medium">{item.itemName}</p>
                             <p className="text-sm text-muted-foreground">
-                              {allocations.map((allocation) => `${allocation.drug.serial_number || "Batch"} x${allocation.quantity}`).join(" | ")}
+                              {pricing.allocations.map((allocation) => `${allocation.drug.serial_number || "Batch"} x${allocation.quantity}`).join(" | ")}
                             </p>
                           </div>
                           <Input
@@ -583,6 +748,14 @@ const BillingPage = () => {
                             max={(itemSummaries.find((summary) => summary.itemName === item.itemName)?.totalStock ?? item.quantity)}
                             value={String(item.quantity)}
                             onChange={(e) => updateBillItemQuantity(item.itemName, e.target.value)}
+                          />
+                          <Input
+                            type="number"
+                            min="0"
+                            max={maxAllowedDiscountPercentage}
+                            step="0.01"
+                            value={String(item.discountPercentage)}
+                            onChange={(e) => updateBillItemDiscount(item.itemName, e.target.value)}
                           />
                           <div className="font-semibold">KSh {lineTotal.toLocaleString()}</div>
                           <Button type="button" variant="ghost" size="icon" onClick={() => removeBillItem(item.itemName)}>
@@ -633,7 +806,7 @@ const BillingPage = () => {
 
               <div className="space-y-3">
                 {latestReceipt.lines.map((line) => (
-                  <div key={line.itemName} className="rounded-lg border p-4">
+                            <div key={line.itemName} className="rounded-lg border p-4">
                     <div className="flex items-center justify-between gap-4">
                       <p className="font-medium">{line.itemName}</p>
                       <p className="font-semibold">KSh {line.lineTotal.toLocaleString()}</p>
