@@ -1,0 +1,214 @@
+import { useEffect, useState } from "react";
+import { supabase } from "@/integrations/supabase/client";
+import { useAuth } from "@/contexts/AuthContext";
+import { logAudit } from "@/lib/audit";
+import { exportToCSV } from "@/lib/csv-export";
+import AppLayout from "@/components/AppLayout";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { toast } from "sonner";
+import { Plus, Pencil, Trash2, Download } from "lucide-react";
+import type { Tables } from "@/integrations/supabase/types";
+import { getExpiryLabel, isExpiredDrug, isExpiringSoonDrug } from "@/lib/inventory";
+
+const emptyDrugForm = {
+  name: "",
+  serial_number: "",
+  expiry_date: "",
+  date_of_purchase: "",
+  buying_price: "",
+  selling_price: "",
+  stock_quantity: "",
+  low_stock_threshold: "10",
+};
+
+const DrugsPage = () => {
+  const { user } = useAuth();
+  const [drugs, setDrugs] = useState<Tables<"drugs">[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [dialogOpen, setDialogOpen] = useState(false);
+  const [editingDrug, setEditingDrug] = useState<Tables<"drugs"> | null>(null);
+  const [form, setForm] = useState(emptyDrugForm);
+
+  const fetchDrugs = async () => {
+    if (!user) return;
+    const { data } = await supabase.from("drugs").select("*").eq("user_id", user.id).order("created_at", { ascending: false });
+    setDrugs(data ?? []);
+    setLoading(false);
+  };
+
+  useEffect(() => { fetchDrugs(); }, [user]);
+
+  const resetForm = () => {
+    setForm(emptyDrugForm);
+    setEditingDrug(null);
+  };
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!user) return;
+    const payload = {
+      user_id: user.id,
+      name: form.name,
+      serial_number: form.serial_number || null,
+      expiry_date: form.expiry_date || null,
+      date_of_purchase: form.date_of_purchase || null,
+      buying_price: parseFloat(form.buying_price),
+      selling_price: parseFloat(form.selling_price),
+      stock_quantity: parseInt(form.stock_quantity),
+      low_stock_threshold: parseInt(form.low_stock_threshold),
+    };
+
+    if (editingDrug) {
+      const { error } = await supabase.from("drugs").update(payload).eq("id", editingDrug.id);
+      if (error) { toast.error(error.message); return; }
+      await logAudit("Updated drug", `Updated ${form.name}`);
+      toast.success("Drug updated!");
+    } else {
+      const { error } = await supabase.from("drugs").insert(payload);
+      if (error) { toast.error(error.message); return; }
+      await logAudit("Added drug", `Added ${form.name}`);
+      toast.success("Drug added!");
+    }
+    setDialogOpen(false);
+    resetForm();
+    fetchDrugs();
+  };
+
+  const handleEdit = (drug: Tables<"drugs">) => {
+    setEditingDrug(drug);
+    setForm({
+      name: drug.name,
+      serial_number: drug.serial_number ?? "",
+      expiry_date: drug.expiry_date ?? "",
+      date_of_purchase: drug.date_of_purchase ?? "",
+      buying_price: String(drug.buying_price),
+      selling_price: String(drug.selling_price),
+      stock_quantity: String(drug.stock_quantity),
+      low_stock_threshold: String(drug.low_stock_threshold),
+    });
+    setDialogOpen(true);
+  };
+
+  const handleDelete = async (drug: Tables<"drugs">) => {
+    if (!confirm(`Delete "${drug.name}"?`)) return;
+    const { error } = await supabase.from("drugs").delete().eq("id", drug.id);
+    if (error) { toast.error(error.message); return; }
+    await logAudit("Deleted drug", `Deleted ${drug.name}`);
+    toast.success("Drug deleted!");
+    fetchDrugs();
+  };
+
+  const getStockBadge = (drug: Tables<"drugs">) => {
+    if (drug.stock_quantity === 0) return <Badge variant="destructive">OUT OF STOCK</Badge>;
+    if (drug.stock_quantity <= drug.low_stock_threshold) return <Badge className="bg-yellow-500 text-yellow-950">LOW STOCK</Badge>;
+    return <Badge className="bg-green-500 text-green-950">In Stock</Badge>;
+  };
+
+  const getExpiryBadge = (drug: Tables<"drugs">) => {
+    if (!drug.expiry_date) return <Badge variant="outline">No Expiry</Badge>;
+    if (isExpiredDrug(drug)) return <Badge variant="destructive">EXPIRED</Badge>;
+    if (isExpiringSoonDrug(drug)) return <Badge className="bg-amber-500 text-amber-950">{getExpiryLabel(drug).toUpperCase()}</Badge>;
+    return <Badge className="bg-sky-500 text-sky-950">VALID</Badge>;
+  };
+
+  const formatDate = (value: string | null) => value ? new Date(value).toLocaleDateString() : "-";
+
+  return (
+    <AppLayout>
+      <div className="space-y-4">
+        <div className="flex items-center justify-between">
+          <h2 className="text-2xl font-bold">Inventory</h2>
+          <div className="flex gap-2">
+            <Button variant="outline" size="sm" onClick={() => exportToCSV(drugs.map(d => ({ Name: d.name, "Serial Number": d.serial_number ?? "", "Expiry Date": d.expiry_date ?? "", "Date of Purchase": d.date_of_purchase ?? "", "Buying Price": d.buying_price, "Selling Price": d.selling_price, Stock: d.stock_quantity })), "drugs-report")}>
+              <Download className="mr-2 h-4 w-4" />CSV
+            </Button>
+            <Dialog open={dialogOpen} onOpenChange={(o) => { setDialogOpen(o); if (!o) resetForm(); }}>
+              <DialogTrigger asChild>
+                <Button size="sm"><Plus className="mr-2 h-4 w-4" />Add Item</Button>
+              </DialogTrigger>
+              <DialogContent>
+                <DialogHeader>
+                  <DialogTitle>{editingDrug ? "Edit Drug" : "Add New Drug"}</DialogTitle>
+                </DialogHeader>
+                <form onSubmit={handleSubmit} className="space-y-4">
+                  <div><Label>Name</Label><Input value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} required /></div>
+                  <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                    <div><Label>Serial Number</Label><Input value={form.serial_number} onChange={(e) => setForm({ ...form, serial_number: e.target.value })} placeholder="Optional batch or serial" /></div>
+                    <div><Label>Expiry Date</Label><Input type="date" value={form.expiry_date} onChange={(e) => setForm({ ...form, expiry_date: e.target.value })} /></div>
+                  </div>
+                  <div><Label>Date of Purchase</Label><Input type="date" value={form.date_of_purchase} onChange={(e) => setForm({ ...form, date_of_purchase: e.target.value })} /></div>
+                  <div className="grid grid-cols-2 gap-4">
+                    <div><Label>Buying Price (KSh)</Label><Input type="number" step="0.01" value={form.buying_price} onChange={(e) => setForm({ ...form, buying_price: e.target.value })} required /></div>
+                    <div><Label>Selling Price (KSh)</Label><Input type="number" step="0.01" value={form.selling_price} onChange={(e) => setForm({ ...form, selling_price: e.target.value })} required /></div>
+                  </div>
+                  <div className="grid grid-cols-2 gap-4">
+                    <div><Label>Stock Quantity</Label><Input type="number" value={form.stock_quantity} onChange={(e) => setForm({ ...form, stock_quantity: e.target.value })} required /></div>
+                    <div><Label>Low Stock Threshold</Label><Input type="number" value={form.low_stock_threshold} onChange={(e) => setForm({ ...form, low_stock_threshold: e.target.value })} required /></div>
+                  </div>
+                  <Button type="submit" className="w-full">{editingDrug ? "Update" : "Add"} Drug</Button>
+                </form>
+              </DialogContent>
+            </Dialog>
+          </div>
+        </div>
+
+        <Card>
+          <CardContent className="p-0">
+            {loading ? (
+              <div className="flex items-center justify-center h-32"><div className="animate-spin rounded-full h-6 w-6 border-b-2 border-primary" /></div>
+            ) : drugs.length === 0 ? (
+              <div className="p-6 text-center text-muted-foreground">No drugs yet. Click "Add Drug" to get started.</div>
+            ) : (
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Name</TableHead>
+                    <TableHead>Serial No.</TableHead>
+                    <TableHead>Expiry</TableHead>
+                    <TableHead>Purchased</TableHead>
+                    <TableHead>Buy Price</TableHead>
+                    <TableHead>Sell Price</TableHead>
+                    <TableHead>Stock</TableHead>
+                    <TableHead>Status</TableHead>
+                    <TableHead className="text-right">Actions</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {drugs.map((d) => (
+                    <TableRow key={d.id}>
+                      <TableCell className="font-medium">{d.name}</TableCell>
+                      <TableCell>{d.serial_number || "-"}</TableCell>
+                      <TableCell>{formatDate(d.expiry_date)}</TableCell>
+                      <TableCell>{formatDate(d.date_of_purchase)}</TableCell>
+                      <TableCell>KSh {Number(d.buying_price).toLocaleString()}</TableCell>
+                      <TableCell>KSh {Number(d.selling_price).toLocaleString()}</TableCell>
+                      <TableCell>{d.stock_quantity}</TableCell>
+                      <TableCell>
+                        <div className="flex flex-wrap gap-2">
+                          {getStockBadge(d)}
+                          {getExpiryBadge(d)}
+                        </div>
+                      </TableCell>
+                      <TableCell className="text-right">
+                        <Button variant="ghost" size="icon" onClick={() => handleEdit(d)}><Pencil className="h-4 w-4" /></Button>
+                        <Button variant="ghost" size="icon" onClick={() => handleDelete(d)}><Trash2 className="h-4 w-4" /></Button>
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            )}
+          </CardContent>
+        </Card>
+      </div>
+    </AppLayout>
+  );
+};
+
+export default DrugsPage;
