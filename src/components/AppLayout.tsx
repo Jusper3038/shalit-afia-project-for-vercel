@@ -13,6 +13,7 @@ import {
   Receipt,
   ScrollText,
   CreditCard,
+  Users,
   LogOut,
   Menu,
   X,
@@ -29,6 +30,7 @@ const navItems = [
   { to: "/patients", label: "Patients", icon: Users, ownerOnly: false },
   { to: "/billing", label: "Billing", icon: Receipt, ownerOnly: false },
   { to: "/payments", label: "Payments", icon: CreditCard, ownerOnly: true },
+  { to: "/users", label: "Users", icon: Users, ownerOnly: true },
   { to: "/audit-logs", label: "Audit Logs", icon: ScrollText, ownerOnly: true },
 ];
 

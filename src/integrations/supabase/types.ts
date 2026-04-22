@@ -274,6 +274,25 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      admin_delete_user: {
+        Args: {
+          p_user_id: string
+        }
+        Returns: undefined
+      }
+      get_system_users: {
+        Args: Record<PropertyKey, never>
+        Returns: {
+          clinic_name: string
+          created_at: string
+          email: string
+          name: string
+          profile_id: string
+          role: Database["public"]["Enums"]["app_role"]
+          updated_at: string
+          user_id: string
+        }[]
+      }
       has_role: {
         Args: {
           _role: Database["public"]["Enums"]["app_role"]

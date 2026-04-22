@@ -16,6 +16,7 @@ const PatientsPage = lazy(() => import("./pages/Patients"));
 const BillingPage = lazy(() => import("./pages/Billing"));
 const PaymentsPage = lazy(() => import("./pages/Payments"));
 const AuditLogsPage = lazy(() => import("./pages/AuditLogs"));
+const UsersPage = lazy(() => import("./pages/Users"));
 const NotFound = lazy(() => import("./pages/NotFound"));
 
 const queryClient = new QueryClient();
@@ -47,6 +48,7 @@ const App = () => (
               <Route path="/billing" element={<ProtectedRoute><BillingPage /></ProtectedRoute>} />
               <Route path="/payments" element={<ProtectedRoute allowedRoles={["admin"]} requireSensitiveVerification><PaymentsPage /></ProtectedRoute>} />
               <Route path="/audit-logs" element={<ProtectedRoute allowedRoles={["admin"]} requireSensitiveVerification><AuditLogsPage /></ProtectedRoute>} />
+              <Route path="/users" element={<ProtectedRoute allowedRoles={["admin"]} requireSensitiveVerification><UsersPage /></ProtectedRoute>} />
               <Route path="*" element={<NotFound />} />
             </Routes>
           </Suspense>
