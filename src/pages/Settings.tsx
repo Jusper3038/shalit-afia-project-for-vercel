@@ -144,25 +144,6 @@ const SettingsPage = () => {
             </Card>
           )}
 
-          {!isPlatformOwner && canClaimPlatformOwner === false && (
-            <Card className="border-primary/20 xl:col-span-2">
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <Crown className="h-5 w-5" />
-                  Creator Access Already Claimed
-                </CardTitle>
-                <CardDescription>
-                  The creator-only account has already been claimed, so this setup panel is no longer available here.
-                </CardDescription>
-              </CardHeader>
-              <CardContent>
-                <p className="text-sm text-muted-foreground">
-                  Only the first account that claimed creator access can see `Platform Accounts` and the lead inbox.
-                </p>
-              </CardContent>
-            </Card>
-          )}
-
           <Card className="border-primary/20">
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
