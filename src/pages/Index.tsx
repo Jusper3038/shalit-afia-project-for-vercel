@@ -64,22 +64,22 @@ const heroImages = [
   {
     src: "https://images.pexels.com/photos/4989168/pexels-photo-4989168.jpeg?cs=srgb&dl=pexels-ivan-s-4989168.jpg&fm=jpg",
     alt: "Smiling doctor leaning forward in a bright modern workspace",
-    caption: "The dashboard opens with a doctor who already knows the day is under control",
+    caption: "The dashboard opens with a clinician who already feels in control",
   },
   {
     src: "https://images.pexels.com/photos/8376333/pexels-photo-8376333.jpeg?cs=srgb&dl=pexels-tima-miroshnichenko-8376333.jpg&fm=jpg",
     alt: "Smiling clinician in a white coat speaking warmly at a desk",
-    caption: "A patient record that feels easy to trust because it stays easy to read",
+    caption: "A patient record that stays easy to read, update, and trust",
   },
   {
     src: "https://images.pexels.com/photos/7578806/pexels-photo-7578806.jpeg?cs=srgb&dl=pexels-cottonbro-7578806.jpg&fm=jpg",
     alt: "Smiling doctor in conversation with a patient in a bright clinic",
-    caption: "One conversation, one visit, one clear path through the visit flow",
+    caption: "One conversation moving cleanly through the visit flow",
   },
   {
-    src: "https://images.pexels.com/photos/34833855/pexels-photo-34833855.jpeg?cs=srgb&dl=pexels-safana-2151149986-34833855.jpg&fm=jpg",
-    alt: "Two joyful clinicians in matching uniforms and pink hijabs",
-    caption: "The shared clinic view that keeps the whole team moving in sync",
+    src: "https://images.pexels.com/photos/19963186/pexels-photo-19963186.jpeg?cs=srgb&dl=pexels-tessy-agbonome-521343232-19963186.jpg&fm=jpg",
+    alt: "Smiling female doctor in blue scrubs on a white background",
+    caption: "A bright, white-background moment that mirrors the app's clarity",
   },
 ];
 
@@ -102,8 +102,8 @@ const Index = () => {
   }
 
   return (
-    <div className="min-h-screen overflow-hidden bg-[linear-gradient(180deg,#f9fdff_0%,#ffffff_38%,#f6fbff_100%)] text-foreground">
-      <header className="sticky top-0 z-40 border-b border-white/60 bg-white/72 backdrop-blur-xl">
+    <div className="min-h-screen overflow-hidden bg-white text-foreground">
+      <header className="sticky top-0 z-40 border-b border-sky-100 bg-white/90 backdrop-blur-xl">
         <div className="mx-auto flex max-w-7xl items-center justify-between px-4 py-4 sm:px-6 lg:px-8">
           <Link to="/" className="flex items-center gap-3">
             <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-primary text-primary-foreground shadow-lg shadow-primary/20">
@@ -144,40 +144,40 @@ const Index = () => {
         </div>
       </header>
 
-      <main>
+      <main className="bg-white">
         <section className="relative">
-          <div className="absolute inset-0 -z-10 bg-[radial-gradient(circle_at_15%_20%,rgba(14,165,233,0.16),transparent_24%),radial-gradient(circle_at_85%_18%,rgba(16,185,129,0.15),transparent_20%),radial-gradient(circle_at_55%_80%,rgba(250,204,21,0.12),transparent_18%)]" />
-          <div className="mx-auto grid max-w-7xl gap-12 px-4 pb-16 pt-10 sm:px-6 lg:grid-cols-[1.05fr_0.95fr] lg:px-8 lg:pb-24 lg:pt-16">
+          <div className="absolute inset-0 -z-10 bg-[radial-gradient(circle_at_15%_20%,rgba(14,165,233,0.08),transparent_24%),radial-gradient(circle_at_85%_18%,rgba(59,130,246,0.08),transparent_20%)]" />
+          <div className="mx-auto grid max-w-7xl gap-16 px-4 pb-20 pt-14 sm:px-6 lg:grid-cols-[1.05fr_0.95fr] lg:px-8 lg:pb-28 lg:pt-20">
             <div className="flex flex-col justify-center">
-              <div className="mb-6 inline-flex w-fit items-center gap-2 rounded-full border border-primary/15 bg-primary/6 px-4 py-2 text-sm font-medium text-primary">
+              <div className="mb-6 inline-flex w-fit items-center gap-2 rounded-full border border-sky-100 bg-sky-50 px-4 py-2 text-sm font-medium text-primary">
                 <Sparkles className="h-4 w-4" />
-                A warmer, calmer clinic starts here
+                A clearer clinic story starts here
               </div>
 
               <h1 className="max-w-2xl text-4xl font-semibold tracking-tight text-foreground sm:text-5xl lg:text-6xl">
-                Build a clinic experience that feels bright, human, and full of trust.
+                A bright white homepage with blue energy and a story that feels easy to follow.
               </h1>
 
               <p className="mt-6 max-w-2xl text-lg leading-8 text-muted-foreground">
-                Shalit Afia brings patients, drugs, billing, payments, and reporting into one uplifting workflow so your
-                team can move with confidence and your patients feel cared for from the first smile to the final receipt.
+                Shalit Afia brings patients, drugs, billing, payments, and reporting into one calm workflow so the whole
+                clinic feels easier to understand, easier to trust, and easier to love using.
               </p>
 
               <div className="mt-8 flex flex-col gap-3 sm:flex-row">
                 <Button asChild size="lg" className="shadow-lg shadow-primary/20">
                   <a href="#gallery">
-                    See the joy
+                    See the story
                     <ArrowRight className="h-4 w-4" />
                   </a>
                 </Button>
                 <Button asChild size="lg" variant="outline" className="border-primary/20 bg-white/80 backdrop-blur">
-                  <a href="#platform">Explore the platform</a>
+                  <a href="#platform">Explore the workflow</a>
                 </Button>
               </div>
 
-              <div className="mt-10 grid gap-4 sm:grid-cols-3">
+              <div className="mt-12 grid gap-4 sm:grid-cols-3">
                 {glowPoints.map((item) => (
-                  <div key={item.label} className="rounded-2xl border border-white/70 bg-white/85 p-4 shadow-sm backdrop-blur transition hover:-translate-y-1 hover:shadow-md">
+                  <div key={item.label} className="rounded-2xl border border-sky-100 bg-white p-5 shadow-sm transition hover:-translate-y-1 hover:shadow-md">
                     <div className="text-lg font-semibold text-foreground">{item.label}</div>
                     <div className="mt-1 text-sm leading-6 text-muted-foreground">{item.detail}</div>
                   </div>
@@ -186,77 +186,77 @@ const Index = () => {
             </div>
 
             <div className="relative">
-              <div className="absolute -left-6 top-8 h-28 w-28 rounded-full bg-primary/10 blur-3xl" />
-              <div className="absolute -right-8 bottom-10 h-32 w-32 rounded-full bg-accent/15 blur-3xl" />
+              <div className="absolute -left-6 top-8 h-28 w-28 rounded-full bg-sky-100 blur-3xl" />
+              <div className="absolute -right-8 bottom-10 h-32 w-32 rounded-full bg-blue-100 blur-3xl" />
 
-              <div className="relative grid gap-4 sm:grid-cols-[1.1fr_0.9fr]">
-                <div className="overflow-hidden rounded-[30px] border border-white/70 bg-white shadow-[0_30px_90px_rgba(15,23,42,0.14)] float-slow">
+              <div className="relative grid gap-5 sm:grid-cols-[1.1fr_0.9fr]">
+                <div className="overflow-hidden rounded-[30px] border border-sky-100 bg-white shadow-[0_30px_90px_rgba(59,130,246,0.08)] float-slow">
                   <img
                     src={heroImages[0].src}
                     alt={heroImages[0].alt}
-                    className="h-[430px] w-full object-cover"
+                    className="h-[470px] w-full object-cover"
                     loading="eager"
                     decoding="async"
                   />
                   <div className="p-4">
                     <p className="text-sm font-semibold text-foreground">{heroImages[0].caption}</p>
-                    <p className="mt-1 text-sm text-muted-foreground">That first glance says the system is already on top of the day.</p>
+                    <p className="mt-1 text-sm text-muted-foreground">The first glance says the clinic is already organized.</p>
                   </div>
                 </div>
 
                 <div className="grid gap-4">
-                  <div className="overflow-hidden rounded-[28px] border border-white/70 bg-white shadow-[0_24px_70px_rgba(15,23,42,0.12)] float-fast">
+                  <div className="overflow-hidden rounded-[28px] border border-sky-100 bg-white shadow-[0_24px_70px_rgba(59,130,246,0.08)] float-fast">
                     <img
                       src={heroImages[1].src}
                       alt={heroImages[1].alt}
-                      className="h-[206px] w-full object-cover"
+                      className="h-[222px] w-full object-cover"
                       loading="eager"
                       decoding="async"
                     />
                     <div className="p-4">
                       <p className="text-sm font-semibold text-foreground">{heroImages[1].caption}</p>
-                      <p className="mt-1 text-sm text-muted-foreground">A clear patient profile makes the next step feel obvious.</p>
+                      <p className="mt-1 text-sm text-muted-foreground">A clear record turns the next step into an easy one.</p>
                     </div>
                   </div>
 
-                  <div className="rounded-[28px] border border-primary/10 bg-primary/95 p-5 text-primary-foreground shadow-[0_24px_70px_rgba(14,165,233,0.2)]">
-                    <div className="flex items-center gap-2 text-sm font-semibold uppercase tracking-[0.22em] text-white/70">
+                  <div className="rounded-[28px] border border-sky-100 bg-sky-50 p-5 text-foreground shadow-sm">
+                    <div className="flex items-center gap-2 text-sm font-semibold uppercase tracking-[0.22em] text-primary">
                       <HeartHandshake className="h-4 w-4" />
                       Workflow lift
                     </div>
-                    <p className="mt-3 text-2xl font-semibold leading-tight">A happier team feels different the moment you open the app.</p>
-                    <p className="mt-2 text-sm leading-6 text-white/80">
-                      More light, less friction, and a dashboard that makes the clinic feel alive, coordinated, and in control.
+                    <p className="mt-3 text-2xl font-semibold leading-tight text-primary">Blue accents guide the eye without taking over the page.</p>
+                    <p className="mt-2 text-sm leading-6 text-muted-foreground">
+                      The visual language stays clean, bright, and uncluttered while the app carries the work.
                     </p>
                   </div>
                 </div>
 
                 <div className="sm:col-span-2 grid gap-4 sm:grid-cols-[0.9fr_1.1fr]">
-                  <div className="overflow-hidden rounded-[28px] border border-white/70 bg-white shadow-[0_24px_70px_rgba(15,23,42,0.12)] float-fast">
+                  <div className="overflow-hidden rounded-[28px] border border-sky-100 bg-white shadow-[0_24px_70px_rgba(59,130,246,0.08)] float-fast">
                     <img
                       src={heroImages[3].src}
                       alt={heroImages[3].alt}
-                      className="h-[220px] w-full object-cover"
+                      className="h-[230px] w-full object-cover"
                       loading="lazy"
                       decoding="async"
                     />
                     <div className="p-4">
                       <p className="text-sm font-semibold text-foreground">{heroImages[3].caption}</p>
-                      <p className="mt-1 text-sm text-muted-foreground">The same case, the same context, the same direction.</p>
+                      <p className="mt-1 text-sm text-muted-foreground">This image now matches the page: white background, blue energy, clear story.</p>
                     </div>
                   </div>
 
-                  <div className="overflow-hidden rounded-[28px] border border-white/70 bg-white shadow-[0_24px_70px_rgba(15,23,42,0.12)] float-slow">
+                  <div className="overflow-hidden rounded-[28px] border border-sky-100 bg-white shadow-[0_24px_70px_rgba(59,130,246,0.08)] float-slow">
                     <img
                       src={heroImages[2].src}
                       alt={heroImages[2].alt}
-                      className="h-[220px] w-full object-cover"
+                      className="h-[230px] w-full object-cover"
                       loading="lazy"
                       decoding="async"
                     />
                     <div className="p-4">
                       <p className="text-sm font-semibold text-foreground">{heroImages[2].caption}</p>
-                      <p className="mt-1 text-sm text-muted-foreground">The visit flow keeps everyone calm from check-in to billing.</p>
+                      <p className="mt-1 text-sm text-muted-foreground">A visit that moves cleanly from hello to handoff.</p>
                     </div>
                   </div>
                 </div>
@@ -265,24 +265,24 @@ const Index = () => {
           </div>
         </section>
 
-        <section id="gallery" className="border-y border-border/60 bg-white/74 py-20">
+        <section id="gallery" className="border-y border-sky-100 bg-white py-24">
           <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
             <div className="max-w-2xl">
               <p className="text-sm font-semibold uppercase tracking-[0.24em] text-primary">Gallery</p>
               <h2 className="mt-3 text-3xl font-semibold tracking-tight text-foreground sm:text-4xl">
-                The images should show the software making real clinic moments easier.
+                Four images, four parts of the story.
               </h2>
               <p className="mt-4 text-base leading-7 text-muted-foreground">
-                Each picture now points back to a product moment: a calmer check-in, a clearer patient view, a smoother
-                handoff, and a billing flow that closes the loop.
+                Each photo ties back to a real product moment: a calmer check-in, a clearer patient view, a smoother handoff,
+                and a billing flow that closes the loop.
               </p>
             </div>
 
-            <div className="mt-10 grid gap-5 md:grid-cols-2 xl:grid-cols-4">
+            <div className="mt-12 grid gap-6 md:grid-cols-2 xl:grid-cols-4">
               {heroImages.map((image, index) => (
                 <div
                   key={image.src}
-                  className="group overflow-hidden rounded-[28px] border border-white/70 bg-white shadow-sm transition duration-300 hover:-translate-y-1 hover:shadow-xl"
+                  className="group overflow-hidden rounded-[28px] border border-sky-100 bg-white shadow-sm transition duration-300 hover:-translate-y-1 hover:shadow-xl"
                 >
                   <div className="relative">
                     <img
@@ -292,8 +292,8 @@ const Index = () => {
                       loading="lazy"
                       decoding="async"
                     />
-                    <div className="absolute inset-0 bg-[linear-gradient(180deg,rgba(255,255,255,0)_40%,rgba(3,7,18,0.32)_100%)]" />
-                    <div className="absolute left-4 top-4 rounded-full border border-white/60 bg-white/85 px-3 py-1 text-xs font-semibold text-primary shadow-sm">
+                    <div className="absolute inset-0 bg-[linear-gradient(180deg,rgba(255,255,255,0)_40%,rgba(14,165,233,0.2)_100%)]" />
+                    <div className="absolute left-4 top-4 rounded-full border border-sky-100 bg-white/90 px-3 py-1 text-xs font-semibold text-primary shadow-sm">
                       {index === 0 ? "Dashboard ready" : index === 1 ? "Record clarity" : index === 2 ? "Visit flow" : "Shared view"}
                     </div>
                   </div>
@@ -309,7 +309,7 @@ const Index = () => {
           </div>
         </section>
 
-        <section id="outcomes" className="py-20">
+        <section id="outcomes" className="py-24">
           <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
             <div className="max-w-2xl">
               <p className="text-sm font-semibold uppercase tracking-[0.24em] text-primary">Outcomes</p>
@@ -321,13 +321,13 @@ const Index = () => {
               </p>
             </div>
 
-            <div className="mt-10 grid gap-5 lg:grid-cols-3">
+            <div className="mt-12 grid gap-6 lg:grid-cols-3">
               {outcomes.map((item) => {
                 const Icon = item.icon;
                 return (
-                  <Card key={item.title} className="border-white/70 bg-white/90 shadow-sm transition hover:-translate-y-1 hover:shadow-xl">
+                  <Card key={item.title} className="border-sky-100 bg-white shadow-sm transition hover:-translate-y-1 hover:shadow-xl">
                     <CardHeader>
-                      <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-primary/10 text-primary">
+                      <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-sky-50 text-primary">
                         <Icon className="h-5 w-5" />
                       </div>
                       <CardTitle className="mt-4 text-xl">{item.title}</CardTitle>
@@ -340,24 +340,23 @@ const Index = () => {
           </div>
         </section>
 
-        <section id="platform" className="py-20">
-          <div className="mx-auto grid max-w-7xl gap-10 px-4 sm:px-6 lg:grid-cols-[0.92fr_1.08fr] lg:px-8">
-            <div className="relative overflow-hidden rounded-[28px] border border-white/70 bg-slate-900 shadow-[0_30px_80px_rgba(15,23,42,0.18)]">
+        <section id="platform" className="py-24">
+          <div className="mx-auto grid max-w-7xl gap-12 px-4 sm:px-6 lg:grid-cols-[0.92fr_1.08fr] lg:px-8">
+            <div className="relative overflow-hidden rounded-[28px] border border-sky-100 bg-white shadow-[0_30px_80px_rgba(59,130,246,0.08)]">
               <img
                 src={heroImages[2].src}
                 alt={heroImages[2].alt}
-                className="h-full min-h-[420px] w-full object-cover opacity-80"
+                className="h-full min-h-[420px] w-full object-cover"
                 loading="lazy"
                 decoding="async"
               />
-              <div className="absolute inset-0 bg-[linear-gradient(180deg,rgba(15,23,42,0.08)_0%,rgba(15,23,42,0.76)_100%)]" />
-              <div className="absolute inset-x-0 bottom-0 p-6 text-white sm:p-8">
-                <p className="text-sm font-semibold uppercase tracking-[0.24em] text-white/70">Story</p>
+              <div className="absolute inset-x-0 bottom-0 bg-[linear-gradient(180deg,rgba(255,255,255,0)_0%,rgba(255,255,255,0.94)_55%,rgba(255,255,255,1)_100%)] p-6 sm:p-8">
+                <p className="text-sm font-semibold uppercase tracking-[0.24em] text-primary">Story</p>
                 <h3 className="mt-3 max-w-lg text-2xl font-semibold leading-tight sm:text-3xl">
-                  A clinic that feels joyful gives patients something to trust before anyone says a word.
+                  The room feels lighter when the software keeps the work flowing and the people smiling.
                 </h3>
-                <p className="mt-3 max-w-lg text-sm leading-6 text-white/75">
-                  The atmosphere becomes lighter for the team and more reassuring for the people walking through the door.
+                <p className="mt-3 max-w-lg text-sm leading-6 text-muted-foreground">
+                  A white canvas, blue accents, and one steady system behind the scenes.
                 </p>
               </div>
             </div>
@@ -374,7 +373,7 @@ const Index = () => {
 
               <div className="mt-8 grid gap-4 sm:grid-cols-2">
                 {capabilities.map((item) => (
-                  <div key={item} className="flex items-start gap-3 rounded-2xl border border-border/70 bg-white/80 p-4 shadow-sm transition hover:-translate-y-0.5 hover:shadow-md">
+                  <div key={item} className="flex items-start gap-3 rounded-2xl border border-sky-100 bg-white p-4 shadow-sm transition hover:-translate-y-0.5 hover:shadow-md">
                     <CheckCircle2 className="mt-0.5 h-5 w-5 shrink-0 text-accent" />
                     <p className="text-sm leading-6 text-foreground">{item}</p>
                   </div>
@@ -396,12 +395,12 @@ const Index = () => {
           </div>
         </section>
 
-        <section className="bg-[linear-gradient(180deg,rgba(14,165,233,0.06)_0%,rgba(16,185,129,0.06)_100%)] py-20">
+        <section className="bg-white py-24">
           <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
             <div className="grid gap-5 lg:grid-cols-3">
-              <Card className="border-white/70 bg-white/90 shadow-sm">
+              <Card className="border-sky-100 bg-white shadow-sm">
                 <CardHeader>
-                  <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-primary/10 text-primary">
+                  <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-sky-50 text-primary">
                     <Stethoscope className="h-5 w-5" />
                   </div>
                   <CardTitle className="mt-4 text-xl">Built for the real clinic day</CardTitle>
@@ -411,9 +410,9 @@ const Index = () => {
                 </CardHeader>
               </Card>
 
-              <Card className="border-white/70 bg-white/90 shadow-sm">
+              <Card className="border-sky-100 bg-white shadow-sm">
                 <CardHeader>
-                  <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-accent/10 text-accent">
+                  <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-sky-50 text-accent">
                     <CalendarDays className="h-5 w-5" />
                   </div>
                   <CardTitle className="mt-4 text-xl">Easy to settle into</CardTitle>
@@ -423,9 +422,9 @@ const Index = () => {
                 </CardHeader>
               </Card>
 
-              <Card className="border-white/70 bg-white/90 shadow-sm">
+              <Card className="border-sky-100 bg-white shadow-sm">
                 <CardHeader>
-                  <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-sky-500/10 text-sky-600">
+                  <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-sky-50 text-sky-600">
                     <BarChart3 className="h-5 w-5" />
                   </div>
                   <CardTitle className="mt-4 text-xl">Feels more alive</CardTitle>
@@ -438,9 +437,9 @@ const Index = () => {
           </div>
         </section>
 
-        <section id="start" className="py-20">
+        <section id="start" className="py-24">
           <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
-            <div className="rounded-[32px] border border-primary/10 bg-primary px-6 py-10 text-primary-foreground shadow-[0_30px_80px_rgba(14,165,233,0.2)] sm:px-10">
+            <div className="rounded-[32px] border border-sky-100 bg-primary px-6 py-12 text-primary-foreground shadow-[0_30px_80px_rgba(14,165,233,0.16)] sm:px-10">
               <div className="grid gap-8 lg:grid-cols-[1fr_auto] lg:items-center">
                 <div>
                   <p className="text-sm font-semibold uppercase tracking-[0.24em] text-white/75">Ready when you are</p>
