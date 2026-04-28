@@ -144,9 +144,9 @@ const Index = () => {
       <main className="bg-white">
         <section className="relative">
           <div className="absolute inset-0 -z-10 bg-[radial-gradient(circle_at_15%_20%,rgba(14,165,233,0.08),transparent_24%),radial-gradient(circle_at_85%_18%,rgba(59,130,246,0.08),transparent_20%)]" />
-          <div className="mx-auto grid max-w-7xl gap-14 px-4 pb-16 pt-8 sm:px-6 lg:grid-cols-[1.05fr_0.95fr] lg:px-8 lg:pb-24 lg:pt-10">
-            <div className="flex flex-col justify-center">
-              <div className="mb-5 inline-flex w-fit items-center rounded-full border border-sky-100 bg-sky-50 px-4 py-2 text-sm font-medium text-primary">
+          <div className="mx-auto grid max-w-7xl gap-12 px-4 pb-14 pt-4 sm:px-6 lg:grid-cols-[1.05fr_0.95fr] lg:items-start lg:px-8 lg:pb-20 lg:pt-4">
+            <div className="flex flex-col justify-start pt-1 lg:pt-3">
+              <div className="mb-4 inline-flex w-fit items-center rounded-full border border-sky-100 bg-sky-50 px-4 py-2 text-sm font-medium text-primary">
                 Clinic story starts here
               </div>
 
@@ -171,7 +171,7 @@ const Index = () => {
                 </Button>
               </div>
 
-              <div className="mt-10 grid gap-4 sm:grid-cols-3">
+              <div className="mt-8 grid gap-4 sm:grid-cols-3">
                 {glowPoints.map((item) => (
                   <div key={item.label} className="rounded-2xl border border-sky-100 bg-white p-5 shadow-sm transition hover:-translate-y-1 hover:shadow-md">
                     <div className="text-lg font-semibold text-foreground">{item.label}</div>
@@ -261,7 +261,7 @@ const Index = () => {
           </div>
         </section>
 
-        <section id="gallery" className="border-y border-sky-100 bg-white py-24">
+        <section id="gallery" className="border-y border-sky-100 bg-white py-14">
           <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
             <div className="max-w-2xl">
               <p className="text-sm font-semibold uppercase tracking-[0.24em] text-primary">Gallery</p>
@@ -305,7 +305,7 @@ const Index = () => {
           </div>
         </section>
 
-        <section id="outcomes" className="py-24">
+        <section id="outcomes" className="py-14">
           <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
             <div className="max-w-2xl">
               <p className="text-sm font-semibold uppercase tracking-[0.24em] text-primary">Outcomes</p>
@@ -336,7 +336,7 @@ const Index = () => {
           </div>
         </section>
 
-        <section id="platform" className="py-24">
+        <section id="platform" className="py-14">
           <div className="mx-auto grid max-w-7xl gap-12 px-4 sm:px-6 lg:grid-cols-[0.92fr_1.08fr] lg:px-8">
             <div className="relative overflow-hidden rounded-[28px] border border-sky-100 bg-white shadow-[0_30px_80px_rgba(59,130,246,0.08)]">
               <img
@@ -357,7 +357,7 @@ const Index = () => {
               </div>
             </div>
 
-            <div className="flex flex-col justify-center">
+            <div className="flex flex-col justify-start">
               <p className="text-sm font-semibold uppercase tracking-[0.24em] text-primary">What changes</p>
               <h2 className="mt-3 text-3xl font-semibold tracking-tight text-foreground sm:text-4xl">
                 Less friction. More presence. More room for the software to do the heavy lifting.
@@ -391,7 +391,7 @@ const Index = () => {
           </div>
         </section>
 
-        <section className="bg-white py-20">
+        <section className="bg-white py-14">
           <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
             <div className="grid gap-5 lg:grid-cols-3">
               <Card className="border-sky-100 bg-white shadow-sm">
@@ -433,7 +433,7 @@ const Index = () => {
           </div>
         </section>
 
-        <section id="start" className="py-20">
+        <section id="start" className="py-14">
           <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
             <div className="rounded-[32px] border border-sky-100 bg-primary px-6 py-12 text-primary-foreground shadow-[0_30px_80px_rgba(14,165,233,0.16)] sm:px-10">
               <div className="grid gap-8 lg:grid-cols-[1fr_auto] lg:items-center">
