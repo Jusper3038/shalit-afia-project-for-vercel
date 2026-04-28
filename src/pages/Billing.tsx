@@ -57,7 +57,7 @@ type TransactionGroup = {
 };
 
 const BillingPage = () => {
-  const { user, profile, role } = useAuth();
+  const { user, profile } = useAuth();
   const [patients, setPatients] = useState<Tables<"patients">[]>([]);
   const [drugs, setDrugs] = useState<Tables<"drugs">[]>([]);
   const [transactions, setTransactions] = useState<Tables<"transactions">[]>([]);
@@ -70,10 +70,9 @@ const BillingPage = () => {
   const [discountPercentage, setDiscountPercentage] = useState("0");
   const [billItems, setBillItems] = useState<BillItem[]>([]);
   const [submitting, setSubmitting] = useState(false);
-  const [savingDiscountSettings, setSavingDiscountSettings] = useState(false);
   const [latestReceipt, setLatestReceipt] = useState<ReceiptData | null>(null);
-  const [minimumProfitRetentionPercentage, setMinimumProfitRetentionPercentage] = useState(
-    String(profile?.minimum_profit_retention_percentage ?? 40)
+  const [maximumDiscountPercentage, setMaximumDiscountPercentage] = useState(
+    String(profile?.minimum_profit_retention_percentage ?? 0)
   );
 
   const fetchAll = async () => {
@@ -91,7 +90,7 @@ const BillingPage = () => {
 
   useEffect(() => { fetchAll(); }, [user]);
   useEffect(() => {
-    setMinimumProfitRetentionPercentage(String(profile?.minimum_profit_retention_percentage ?? 40));
+    setMaximumDiscountPercentage(String(profile?.minimum_profit_retention_percentage ?? 0));
   }, [profile?.minimum_profit_retention_percentage]);
 
   const availableDrugs = drugs.filter((d) => d.stock_quantity > 0);
@@ -146,8 +145,8 @@ const BillingPage = () => {
 
   const selectedItemSummary = itemSummaries.find((item) => item.itemName === selectedDrug);
   const draftQuantity = parseInt(quantity || "0", 10);
-  const configuredMinimumProfitRetentionPercentage = clampPercent(
-    parseFloat(minimumProfitRetentionPercentage || "40")
+  const configuredMaximumDiscountPercentage = clampPercent(
+    parseFloat(maximumDiscountPercentage || "0")
   );
 
   const getDrugById = (drugId: string) => drugs.find((drug) => drug.id === drugId);
@@ -182,8 +181,8 @@ const BillingPage = () => {
     if (!allocations || allocations.length === 0) return 0;
 
     return Math.min(
-      ...allocations.map((allocation) =>
-        getMaxDiscountPercentageForDrug(allocation.drug, configuredMinimumProfitRetentionPercentage)
+        ...allocations.map((allocation) =>
+        getMaxDiscountPercentageForDrug(allocation.drug, configuredMaximumDiscountPercentage)
       )
     );
   };
@@ -202,12 +201,12 @@ const BillingPage = () => {
       pricedAllocations: allocations.map((allocation) => {
         const discountedUnitPrice = getDiscountedUnitPrice(
           allocation.drug,
-          configuredMinimumProfitRetentionPercentage,
+          configuredMaximumDiscountPercentage,
           appliedDiscountPercentage
         );
         const protectedUnitPrice = getProtectedUnitPrice(
           allocation.drug,
-          configuredMinimumProfitRetentionPercentage
+          configuredMaximumDiscountPercentage
         );
 
         return {
@@ -325,31 +324,6 @@ const BillingPage = () => {
 
   const removeBillItem = (itemName: string) => {
     setBillItems((current) => current.filter((item) => item.itemName !== itemName));
-  };
-
-  const saveDiscountSettings = async () => {
-    if (!user) return;
-    setSavingDiscountSettings(true);
-
-    const { error } = await supabase
-      .from("profiles")
-      .update({
-        minimum_profit_retention_percentage: configuredMinimumProfitRetentionPercentage,
-      })
-      .eq("user_id", user.id);
-
-    setSavingDiscountSettings(false);
-
-    if (error) {
-      toast.error(error.message);
-      return;
-    }
-
-    await logAudit(
-      "Updated discount guardrail",
-      `Minimum profit retained set to ${configuredMinimumProfitRetentionPercentage}%`
-    );
-    toast.success("Discount guardrail updated.");
   };
 
   const buildReceiptMarkup = (receipt: ReceiptData) => {
@@ -565,35 +539,6 @@ const BillingPage = () => {
             </CardTitle>
           </CardHeader>
           <CardContent>
-            {role === "admin" && (
-              <div className="mb-6 rounded-xl border bg-accent/20 p-4">
-                <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
-                  <div className="space-y-1">
-                    <p className="font-medium">Global Discount Guardrail</p>
-                    <p className="text-sm text-muted-foreground">
-                      Keep at least this percentage of the original profit on every sale. This rule applies to all products.
-                    </p>
-                  </div>
-                  <div className="flex flex-col gap-3 sm:flex-row sm:items-end">
-                    <div className="space-y-2">
-                      <Label>Minimum Profit To Keep (%)</Label>
-                      <Input
-                        type="number"
-                        min="0"
-                        max="100"
-                        step="1"
-                        value={minimumProfitRetentionPercentage}
-                        onChange={(e) => setMinimumProfitRetentionPercentage(e.target.value)}
-                        className="w-full sm:w-[200px]"
-                      />
-                    </div>
-                    <Button type="button" onClick={saveDiscountSettings} disabled={savingDiscountSettings}>
-                      {savingDiscountSettings ? "Saving..." : "Save Guardrail"}
-                    </Button>
-                  </div>
-                </div>
-              </div>
-            )}
             <form onSubmit={handleBill} className="space-y-6">
               <div>
                 <Label>Patient</Label>
@@ -701,6 +646,9 @@ const BillingPage = () => {
                     )}
                     <p className="text-sm text-muted-foreground">
                       Max allowed discount: {selectedItemSummary ? getMaxDiscountPercentageForItem(selectedItemSummary.itemName, Math.max(draftQuantity, 1)).toFixed(2) : "0.00"}%
+                    </p>
+                    <p className="text-sm text-muted-foreground">
+                      Global discount limit: {configuredMaximumDiscountPercentage.toFixed(2)}%
                     </p>
                     {draftPricing && draftPricing.appliedDiscountPercentage > 0 && (
                       <p className="text-sm text-muted-foreground">

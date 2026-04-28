@@ -9,7 +9,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { toast } from "sonner";
 import { Plus, Pencil, Trash2, Download } from "lucide-react";
@@ -27,13 +27,29 @@ const emptyDrugForm = {
   low_stock_threshold: "10",
 };
 
+type PendingSensitiveAction =
+  | { type: "edit"; drug: Tables<"drugs"> }
+  | { type: "delete"; drug: Tables<"drugs"> }
+  | null;
+
 const DrugsPage = () => {
-  const { user } = useAuth();
+  const {
+    user,
+    hasOwnerSecurityPin,
+    isSensitiveAccessVerified,
+    verifySensitiveAccess,
+    setOwnerSecurityPin,
+  } = useAuth();
   const [drugs, setDrugs] = useState<Tables<"drugs">[]>([]);
   const [loading, setLoading] = useState(true);
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editingDrug, setEditingDrug] = useState<Tables<"drugs"> | null>(null);
   const [form, setForm] = useState(emptyDrugForm);
+  const [pinDialogOpen, setPinDialogOpen] = useState(false);
+  const [pin, setPin] = useState("");
+  const [confirmPin, setConfirmPin] = useState("");
+  const [verifyingPin, setVerifyingPin] = useState(false);
+  const [pendingSensitiveAction, setPendingSensitiveAction] = useState<PendingSensitiveAction>(null);
 
   const fetchDrugs = async () => {
     if (!user) return;
@@ -47,6 +63,36 @@ const DrugsPage = () => {
   const resetForm = () => {
     setForm(emptyDrugForm);
     setEditingDrug(null);
+  };
+
+  const resetPinDialog = () => {
+    setPin("");
+    setConfirmPin("");
+    setPendingSensitiveAction(null);
+  };
+
+  const openEditDialog = (drug: Tables<"drugs">) => {
+    setEditingDrug(drug);
+    setForm({
+      name: drug.name,
+      serial_number: drug.serial_number ?? "",
+      expiry_date: drug.expiry_date ?? "",
+      date_of_purchase: drug.date_of_purchase ?? "",
+      buying_price: String(drug.buying_price),
+      selling_price: String(drug.selling_price),
+      stock_quantity: String(drug.stock_quantity),
+      low_stock_threshold: String(drug.low_stock_threshold),
+    });
+    setDialogOpen(true);
+  };
+
+  const performDelete = async (drug: Tables<"drugs">) => {
+    if (!confirm(`Delete "${drug.name}"?`)) return;
+    const { error } = await supabase.from("drugs").delete().eq("id", drug.id);
+    if (error) { toast.error(error.message); return; }
+    await logAudit("Deleted drug", `Deleted ${drug.name}`);
+    toast.success("Drug deleted!");
+    fetchDrugs();
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -80,28 +126,58 @@ const DrugsPage = () => {
     fetchDrugs();
   };
 
-  const handleEdit = (drug: Tables<"drugs">) => {
-    setEditingDrug(drug);
-    setForm({
-      name: drug.name,
-      serial_number: drug.serial_number ?? "",
-      expiry_date: drug.expiry_date ?? "",
-      date_of_purchase: drug.date_of_purchase ?? "",
-      buying_price: String(drug.buying_price),
-      selling_price: String(drug.selling_price),
-      stock_quantity: String(drug.stock_quantity),
-      low_stock_threshold: String(drug.low_stock_threshold),
-    });
-    setDialogOpen(true);
+  const requestSensitiveAction = (action: PendingSensitiveAction) => {
+    if (!action) return;
+
+    if (isSensitiveAccessVerified()) {
+      if (action.type === "edit") {
+        openEditDialog(action.drug);
+        return;
+      }
+
+      void performDelete(action.drug);
+      return;
+    }
+
+    setPendingSensitiveAction(action);
+    setPinDialogOpen(true);
   };
 
-  const handleDelete = async (drug: Tables<"drugs">) => {
-    if (!confirm(`Delete "${drug.name}"?`)) return;
-    const { error } = await supabase.from("drugs").delete().eq("id", drug.id);
-    if (error) { toast.error(error.message); return; }
-    await logAudit("Deleted drug", `Deleted ${drug.name}`);
-    toast.success("Drug deleted!");
-    fetchDrugs();
+  const handleEdit = (drug: Tables<"drugs">) => {
+    requestSensitiveAction({ type: "edit", drug });
+  };
+
+  const handleDelete = (drug: Tables<"drugs">) => {
+    requestSensitiveAction({ type: "delete", drug });
+  };
+
+  const handleVerifySensitiveAction = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!pendingSensitiveAction) return;
+
+    setVerifyingPin(true);
+    const { error } = hasOwnerSecurityPin
+      ? await verifySensitiveAccess(pin)
+      : await setOwnerSecurityPin(pin);
+    setVerifyingPin(false);
+
+    if (error) {
+      toast.error(error);
+      return;
+    }
+
+    toast.success(hasOwnerSecurityPin ? "Owner access verified." : "Security PIN created and owner access unlocked.");
+
+    const action = pendingSensitiveAction;
+    setPinDialogOpen(false);
+    resetPinDialog();
+
+    if (action.type === "edit") {
+      openEditDialog(action.drug);
+      return;
+    }
+
+    await performDelete(action.drug);
   };
 
   const getStockBadge = (drug: Tables<"drugs">) => {
@@ -118,6 +194,8 @@ const DrugsPage = () => {
   };
 
   const formatDate = (value: string | null) => value ? new Date(value).toLocaleDateString() : "-";
+  const pinSetupInvalid = !hasOwnerSecurityPin && (pin.length < 4 || pin !== confirmPin);
+  const sensitiveActionLabel = pendingSensitiveAction?.type === "delete" ? "delete this item" : "edit this item";
 
   return (
     <AppLayout>
@@ -207,6 +285,61 @@ const DrugsPage = () => {
           </CardContent>
         </Card>
       </div>
+      <Dialog
+        open={pinDialogOpen}
+        onOpenChange={(open) => {
+          setPinDialogOpen(open);
+          if (!open) {
+            resetPinDialog();
+          }
+        }}
+      >
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>{hasOwnerSecurityPin ? "Enter Owner Security PIN" : "Create Owner Security PIN"}</DialogTitle>
+            <DialogDescription>
+              {hasOwnerSecurityPin
+                ? `Enter the owner Security PIN to ${sensitiveActionLabel}.`
+                : `Create a 4 to 6 digit owner Security PIN before you can ${sensitiveActionLabel}. Adding new inventory remains open.`}
+            </DialogDescription>
+          </DialogHeader>
+          <form onSubmit={handleVerifySensitiveAction} className="space-y-4">
+            <div className="space-y-2">
+              <Label htmlFor="inventory-owner-pin">Owner Security PIN</Label>
+              <Input
+                id="inventory-owner-pin"
+                type="password"
+                inputMode="numeric"
+                maxLength={6}
+                value={pin}
+                onChange={(e) => setPin(e.target.value.replace(/\D/g, "").slice(0, 6))}
+                placeholder="Enter 4 to 6 digits"
+                required
+              />
+            </div>
+            {!hasOwnerSecurityPin && (
+              <div className="space-y-2">
+                <Label htmlFor="inventory-owner-pin-confirm">Confirm Security PIN</Label>
+                <Input
+                  id="inventory-owner-pin-confirm"
+                  type="password"
+                  inputMode="numeric"
+                  maxLength={6}
+                  value={confirmPin}
+                  onChange={(e) => setConfirmPin(e.target.value.replace(/\D/g, "").slice(0, 6))}
+                  placeholder="Re-enter Security PIN"
+                  required
+                />
+              </div>
+            )}
+            <DialogFooter>
+              <Button type="submit" disabled={verifyingPin || pinSetupInvalid}>
+                {verifyingPin ? "Verifying..." : hasOwnerSecurityPin ? "Unlock Action" : "Save PIN"}
+              </Button>
+            </DialogFooter>
+          </form>
+        </DialogContent>
+      </Dialog>
     </AppLayout>
   );
 };

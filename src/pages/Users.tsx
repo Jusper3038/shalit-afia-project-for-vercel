@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { logAudit } from "@/lib/audit";
+import { useAuth } from "@/contexts/AuthContext";
 import AppLayout from "@/components/AppLayout";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -8,13 +9,15 @@ import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { toast } from "sonner";
-import { Trash2, Users as UsersIcon } from "lucide-react";
+import { Power, ShieldCheck, Trash2, Users as UsersIcon } from "lucide-react";
 import type { Enums } from "@/integrations/supabase/types";
 
 type SystemUser = {
   clinic_name: string;
   created_at: string;
+  deactivated_at: string | null;
   email: string;
+  is_active: boolean;
   name: string;
   profile_id: string;
   role: Enums<"app_role">;
@@ -23,14 +26,17 @@ type SystemUser = {
 };
 
 const UsersPage = () => {
+  const { isPlatformOwner, claimPlatformOwnerAccess, user } = useAuth();
   const [users, setUsers] = useState<SystemUser[]>([]);
   const [loading, setLoading] = useState(true);
   const [deletingUserId, setDeletingUserId] = useState<string | null>(null);
+  const [updatingStatusUserId, setUpdatingStatusUserId] = useState<string | null>(null);
+  const [claimingAccess, setClaimingAccess] = useState(false);
   const [searchTerm, setSearchTerm] = useState("");
 
   const fetchUsers = async () => {
     setLoading(true);
-    const { data, error } = await supabase.rpc("get_system_users");
+    const { data, error } = await supabase.rpc("get_platform_accounts");
     setLoading(false);
 
     if (error) {
@@ -42,8 +48,10 @@ const UsersPage = () => {
   };
 
   useEffect(() => {
-    fetchUsers();
-  }, []);
+    if (isPlatformOwner) {
+      fetchUsers();
+    }
+  }, [isPlatformOwner]);
 
   const handleDelete = async (user: SystemUser) => {
     const confirmed = window.confirm(
@@ -53,7 +61,7 @@ const UsersPage = () => {
     if (!confirmed) return;
 
     setDeletingUserId(user.user_id);
-    const { error } = await supabase.rpc("admin_delete_user", {
+    const { error } = await supabase.rpc("platform_delete_account", {
       p_user_id: user.user_id,
     });
     setDeletingUserId(null);
@@ -63,8 +71,52 @@ const UsersPage = () => {
       return;
     }
 
-    await logAudit("Deleted user account", `Deleted ${user.email}`);
+    await logAudit("Deleted platform account", `Deleted ${user.email}`);
     toast.success("User account deleted.");
+    fetchUsers();
+  };
+
+  const handleToggleStatus = async (account: SystemUser) => {
+    const nextActiveState = !account.is_active;
+    const actionLabel = nextActiveState ? "reactivate" : "deactivate";
+    const confirmed = window.confirm(
+      `${actionLabel.charAt(0).toUpperCase()}${actionLabel.slice(1)} ${account.name || account.email}?`
+    );
+
+    if (!confirmed) return;
+
+    setUpdatingStatusUserId(account.user_id);
+    const { error } = await supabase.rpc("platform_set_account_status", {
+      p_user_id: account.user_id,
+      p_is_active: nextActiveState,
+      p_reason: nextActiveState ? null : "Deactivated by platform owner",
+    });
+    setUpdatingStatusUserId(null);
+
+    if (error) {
+      toast.error(error.message);
+      return;
+    }
+
+    await logAudit(
+      nextActiveState ? "Reactivated platform account" : "Deactivated platform account",
+      `${nextActiveState ? "Reactivated" : "Deactivated"} ${account.email}`
+    );
+    toast.success(`Account ${nextActiveState ? "reactivated" : "deactivated"}.`);
+    fetchUsers();
+  };
+
+  const handleClaimPlatformOwner = async () => {
+    setClaimingAccess(true);
+    const { error } = await claimPlatformOwnerAccess();
+    setClaimingAccess(false);
+
+    if (error) {
+      toast.error(error);
+      return;
+    }
+
+    toast.success("Platform owner access enabled for this account.");
     fetchUsers();
   };
 
@@ -80,14 +132,49 @@ const UsersPage = () => {
     ].some((value) => value?.toLowerCase().includes(needle));
   });
 
+  if (!isPlatformOwner) {
+    return (
+      <AppLayout>
+        <div className="space-y-6">
+          <div>
+            <h2 className="text-2xl font-bold">Platform Accounts</h2>
+            <p className="text-sm text-muted-foreground">
+              This page is reserved for the creator of the system to manage every account globally.
+            </p>
+          </div>
+
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <ShieldCheck className="h-5 w-5" />
+                Platform Owner Access
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <p className="text-sm text-muted-foreground">
+                The first successful claim creates the platform owner account for this system and unlocks the global account management page.
+              </p>
+              <p className="text-sm text-muted-foreground">
+                Current account: <span className="font-medium text-foreground">{user?.email || "Unknown user"}</span>
+              </p>
+              <Button type="button" onClick={handleClaimPlatformOwner} disabled={claimingAccess}>
+                {claimingAccess ? "Claiming..." : "Claim Platform Owner Access"}
+              </Button>
+            </CardContent>
+          </Card>
+        </div>
+      </AppLayout>
+    );
+  }
+
   return (
     <AppLayout>
       <div className="space-y-6">
         <div className="flex flex-col gap-3 lg:flex-row lg:items-end lg:justify-between">
           <div>
-            <h2 className="text-2xl font-bold">System Users</h2>
+            <h2 className="text-2xl font-bold">Platform Accounts</h2>
             <p className="text-sm text-muted-foreground">
-              Review all registered users in the system and remove accounts when needed.
+              Creator-only view of every clinic account using this system. You can deactivate or delete accounts here.
             </p>
           </div>
           <Input
@@ -110,18 +197,18 @@ const UsersPage = () => {
           </Card>
           <Card>
             <CardHeader className="pb-2">
-              <CardTitle className="text-sm font-medium">Admins</CardTitle>
+              <CardTitle className="text-sm font-medium">Active Accounts</CardTitle>
             </CardHeader>
             <CardContent>
-              <span className="text-2xl font-bold">{users.filter((user) => user.role === "admin").length}</span>
+              <span className="text-2xl font-bold">{users.filter((account) => account.is_active).length}</span>
             </CardContent>
           </Card>
           <Card>
             <CardHeader className="pb-2">
-              <CardTitle className="text-sm font-medium">Staff</CardTitle>
+              <CardTitle className="text-sm font-medium">Deactivated</CardTitle>
             </CardHeader>
             <CardContent>
-              <span className="text-2xl font-bold">{users.filter((user) => user.role === "staff").length}</span>
+              <span className="text-2xl font-bold">{users.filter((account) => !account.is_active).length}</span>
             </CardContent>
           </Card>
         </div>
@@ -145,6 +232,7 @@ const UsersPage = () => {
                     <TableHead>Email</TableHead>
                     <TableHead>Clinic</TableHead>
                     <TableHead>Role</TableHead>
+                    <TableHead>Status</TableHead>
                     <TableHead>Joined</TableHead>
                     <TableHead className="text-right">Actions</TableHead>
                   </TableRow>
@@ -160,18 +248,37 @@ const UsersPage = () => {
                           {user.role}
                         </Badge>
                       </TableCell>
+                      <TableCell>
+                        <Badge variant={user.is_active ? "default" : "destructive"}>
+                          {user.is_active ? "Active" : "Deactivated"}
+                        </Badge>
+                      </TableCell>
                       <TableCell>{new Date(user.created_at).toLocaleDateString()}</TableCell>
                       <TableCell className="text-right">
-                        <Button
-                          type="button"
-                          variant="destructive"
-                          size="sm"
-                          onClick={() => handleDelete(user)}
-                          disabled={deletingUserId === user.user_id}
-                        >
-                          <Trash2 className="mr-2 h-4 w-4" />
-                          {deletingUserId === user.user_id ? "Deleting..." : "Delete"}
-                        </Button>
+                        <div className="flex justify-end gap-2">
+                          <Button
+                            type="button"
+                            variant="outline"
+                            size="sm"
+                            onClick={() => handleToggleStatus(user)}
+                            disabled={updatingStatusUserId === user.user_id}
+                          >
+                            <Power className="mr-2 h-4 w-4" />
+                            {updatingStatusUserId === user.user_id
+                              ? "Saving..."
+                              : user.is_active ? "Deactivate" : "Reactivate"}
+                          </Button>
+                          <Button
+                            type="button"
+                            variant="destructive"
+                            size="sm"
+                            onClick={() => handleDelete(user)}
+                            disabled={deletingUserId === user.user_id}
+                          >
+                            <Trash2 className="mr-2 h-4 w-4" />
+                            {deletingUserId === user.user_id ? "Deleting..." : "Delete"}
+                          </Button>
+                        </div>
                       </TableCell>
                     </TableRow>
                   ))}

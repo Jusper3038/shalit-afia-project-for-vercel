@@ -9,41 +9,43 @@ export const clampPercent = (value: number) => {
 
 export const getProtectedUnitPrice = (
   drug: Pick<Tables<"drugs">, "buying_price" | "selling_price">,
-  minimumProfitRetentionPercentage: number
+  maximumDiscountPercentage: number
 ) => {
   const buyingPrice = Number(drug.buying_price);
   const sellingPrice = Number(drug.selling_price);
-  const retainedProfitShare = clampPercent(minimumProfitRetentionPercentage) / 100;
+  const configuredDiscountShare = clampPercent(maximumDiscountPercentage) / 100;
 
   if (sellingPrice <= buyingPrice) {
     return roundCurrency(sellingPrice);
   }
 
-  return roundCurrency(
-    buyingPrice + (sellingPrice - buyingPrice) * retainedProfitShare
-  );
+  const discountedFloorPrice = sellingPrice * (1 - configuredDiscountShare);
+  return roundCurrency(Math.max(buyingPrice, discountedFloorPrice));
 };
 
 export const getMaxDiscountPercentageForDrug = (
   drug: Pick<Tables<"drugs">, "buying_price" | "selling_price">,
-  minimumProfitRetentionPercentage: number
+  maximumDiscountPercentage: number
 ) => {
+  const buyingPrice = Number(drug.buying_price);
   const sellingPrice = Number(drug.selling_price);
   if (sellingPrice <= 0) return 0;
 
-  const protectedUnitPrice = getProtectedUnitPrice(drug, minimumProfitRetentionPercentage);
-  return roundCurrency(
-    ((sellingPrice - protectedUnitPrice) / sellingPrice) * 100
-  );
+  const configuredMaximumDiscount = clampPercent(maximumDiscountPercentage);
+  const costSafeMaximumDiscount = sellingPrice <= buyingPrice
+    ? 0
+    : ((sellingPrice - buyingPrice) / sellingPrice) * 100;
+
+  return roundCurrency(Math.min(configuredMaximumDiscount, costSafeMaximumDiscount));
 };
 
 export const getDiscountedUnitPrice = (
   drug: Pick<Tables<"drugs">, "buying_price" | "selling_price">,
-  minimumProfitRetentionPercentage: number,
+  maximumDiscountPercentage: number,
   requestedDiscountPercentage: number
 ) => {
   const sellingPrice = Number(drug.selling_price);
-  const maxDiscountPercentage = getMaxDiscountPercentageForDrug(drug, minimumProfitRetentionPercentage);
+  const maxDiscountPercentage = getMaxDiscountPercentageForDrug(drug, maximumDiscountPercentage);
   const appliedDiscountPercentage = Math.min(clampPercent(requestedDiscountPercentage), maxDiscountPercentage);
 
   return roundCurrency(

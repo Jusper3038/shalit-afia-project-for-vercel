@@ -147,8 +147,11 @@ export type Database = {
         Row: {
           clinic_name: string
           created_at: string
+          deactivated_at: string | null
+          deactivation_reason: string | null
           email: string
           id: string
+          is_active: boolean
           minimum_profit_retention_percentage: number
           name: string
           updated_at: string
@@ -157,8 +160,11 @@ export type Database = {
         Insert: {
           clinic_name?: string
           created_at?: string
+          deactivated_at?: string | null
+          deactivation_reason?: string | null
           email?: string
           id?: string
+          is_active?: boolean
           minimum_profit_retention_percentage?: number
           name?: string
           updated_at?: string
@@ -167,11 +173,29 @@ export type Database = {
         Update: {
           clinic_name?: string
           created_at?: string
+          deactivated_at?: string | null
+          deactivation_reason?: string | null
           email?: string
           id?: string
+          is_active?: boolean
           minimum_profit_retention_percentage?: number
           name?: string
           updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
+      platform_owners: {
+        Row: {
+          created_at: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
           user_id?: string
         }
         Relationships: []
@@ -299,6 +323,66 @@ export type Database = {
           _user_id: string
         }
         Returns: boolean
+      }
+      has_owner_security_pin: {
+        Args: Record<PropertyKey, never>
+        Returns: boolean
+      }
+      verify_owner_security_pin: {
+        Args: {
+          p_pin: string
+        }
+        Returns: boolean
+      }
+      set_owner_security_pin: {
+        Args: {
+          p_current_pin?: string | null
+          p_pin: string
+        }
+        Returns: undefined
+      }
+      clear_owner_security_pin: {
+        Args: Record<PropertyKey, never>
+        Returns: undefined
+      }
+      claim_platform_owner_access: {
+        Args: Record<PropertyKey, never>
+        Returns: boolean
+      }
+      get_platform_accounts: {
+        Args: Record<PropertyKey, never>
+        Returns: {
+          clinic_name: string
+          created_at: string
+          deactivated_at: string | null
+          email: string
+          is_active: boolean
+          name: string
+          profile_id: string
+          role: Database["public"]["Enums"]["app_role"]
+          updated_at: string
+          user_id: string
+        }[]
+      }
+      is_platform_owner: {
+        Args: {
+          _user_id: string
+        }
+        Returns: boolean
+      }
+      platform_delete_account: {
+        Args: {
+          p_user_id: string
+        }
+        Returns: undefined
+      }
+      platform_set_account_status: {
+        Args: {
+          p_is_active: boolean
+          p_reason?: string | null
+          p_user_id: string
+        }
+        Returns: undefined
       }
       record_sale: {
         Args: {

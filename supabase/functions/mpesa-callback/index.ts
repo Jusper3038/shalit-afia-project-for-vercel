@@ -4,6 +4,11 @@ const corsHeaders = {
 }
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.49.1'
 
+type CallbackMetadataItem = {
+  Name?: string
+  Value?: string | number | null
+}
+
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response('ok', { headers: corsHeaders })
@@ -29,8 +34,8 @@ Deno.serve(async (req) => {
 
     if (resultCode === 0) {
       // Payment successful
-      const metadata = callback.CallbackMetadata?.Item || []
-      const mpesaReceipt = metadata.find((i: any) => i.Name === 'MpesaReceiptNumber')?.Value || ''
+      const metadata: CallbackMetadataItem[] = callback.CallbackMetadata?.Item || []
+      const mpesaReceipt = metadata.find((item) => item.Name === 'MpesaReceiptNumber')?.Value || ''
 
       await supabase
         .from('payments')
@@ -51,7 +56,8 @@ Deno.serve(async (req) => {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     })
   } catch (error) {
-    return new Response(JSON.stringify({ ResultCode: 1, ResultDesc: error.message }), {
+    const message = error instanceof Error ? error.message : 'Unknown callback error'
+    return new Response(JSON.stringify({ ResultCode: 1, ResultDesc: message }), {
       status: 500,
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     })
