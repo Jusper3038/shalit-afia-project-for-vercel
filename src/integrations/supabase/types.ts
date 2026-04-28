@@ -364,6 +364,10 @@ export type Database = {
         Args: Record<PropertyKey, never>
         Returns: boolean
       }
+      has_platform_owner: {
+        Args: Record<PropertyKey, never>
+        Returns: boolean
+      }
       verify_owner_security_pin: {
         Args: {
           p_pin: string

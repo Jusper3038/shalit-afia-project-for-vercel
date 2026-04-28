@@ -13,6 +13,7 @@ import { Crown, LockKeyhole, ShieldCheck, Tags } from "lucide-react";
 
 const SettingsPage = () => {
   const { user, profile, hasOwnerSecurityPin, isPlatformOwner, claimPlatformOwnerAccess, setOwnerSecurityPin } = useAuth();
+  const [hasPlatformOwner, setHasPlatformOwner] = useState<boolean | null>(null);
   const [currentPin, setCurrentPin] = useState("");
   const [newPin, setNewPin] = useState("");
   const [confirmPin, setConfirmPin] = useState("");
@@ -26,6 +27,21 @@ const SettingsPage = () => {
   useEffect(() => {
     setMaximumDiscountPercentage(String(profile?.minimum_profit_retention_percentage ?? 0));
   }, [profile?.minimum_profit_retention_percentage]);
+
+  useEffect(() => {
+    const loadHasPlatformOwner = async () => {
+      const { data, error } = await supabase.rpc("has_platform_owner");
+      if (error) {
+        toast.error(error.message);
+        setHasPlatformOwner(false);
+        return;
+      }
+
+      setHasPlatformOwner(Boolean(data));
+    };
+
+    void loadHasPlatformOwner();
+  }, []);
 
   const pinMismatch = newPin.length < 4 || newPin !== confirmPin;
   const configuredMaximumDiscountPercentage = clampPercent(
@@ -88,6 +104,7 @@ const SettingsPage = () => {
       return;
     }
 
+    setHasPlatformOwner(true);
     await logAudit("Claimed platform owner access", `Platform owner access claimed by ${user?.email || "unknown user"}.`);
     toast.success("Platform owner access claimed. The separate Platform Accounts page is now unlocked.");
   };
@@ -103,7 +120,7 @@ const SettingsPage = () => {
         </div>
 
         <div className="grid gap-6 xl:grid-cols-2">
-          {!isPlatformOwner && (
+          {!isPlatformOwner && hasPlatformOwner === false && (
             <Card className="border-primary/20 xl:col-span-2">
               <CardHeader>
                 <CardTitle className="flex items-center gap-2">
@@ -111,19 +128,38 @@ const SettingsPage = () => {
                   Platform Owner Setup
                 </CardTitle>
                 <CardDescription>
-                  Use this once to unlock your separate creator-only page for managing every account on the system.
+                  Use this once to unlock the separate creator-only page for managing every account on the system.
                 </CardDescription>
               </CardHeader>
               <CardContent className="space-y-4">
                 <p className="text-sm text-muted-foreground">
-                  Once claimed, the `Platform Accounts` page appears only for the platform owner and is hidden from normal clinic accounts.
+                  This access is one-time only. After the first account claims it, the `Platform Accounts` page belongs to that account alone.
                 </p>
                 <p className="text-sm text-muted-foreground">
-                  The lead inbox now lives in `Platform Accounts`, so only the creator sees new homepage inquiries there.
+                  The lead inbox lives in `Platform Accounts`, so only the creator sees new homepage inquiries there.
                 </p>
                 <Button type="button" onClick={handleClaimPlatformOwner} disabled={claimingPlatformOwner}>
                   {claimingPlatformOwner ? "Claiming..." : "Claim Platform Owner Access"}
                 </Button>
+              </CardContent>
+            </Card>
+          )}
+
+          {!isPlatformOwner && hasPlatformOwner === true && (
+            <Card className="border-primary/20 xl:col-span-2">
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <Crown className="h-5 w-5" />
+                  Creator Access Already Claimed
+                </CardTitle>
+                <CardDescription>
+                  The creator-only account has already been claimed, so this setup panel is no longer available here.
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <p className="text-sm text-muted-foreground">
+                  Only the first account that claimed creator access can see `Platform Accounts` and the lead inbox.
+                </p>
               </CardContent>
             </Card>
           )}
