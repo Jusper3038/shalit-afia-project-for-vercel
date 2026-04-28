@@ -25,6 +25,7 @@ import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
 import { Card, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { useAuth } from "@/contexts/AuthContext";
+import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 
 const outcomes = [
@@ -120,11 +121,28 @@ const Index = () => {
       return;
     }
 
-    toast.success("Thanks. We’ll reach out soon.");
-    setLeadOpen(false);
-    setLeadName("");
-    setLeadEmail("");
-    setLeadClinic("");
+    const submitLead = async () => {
+      const { error } = await supabase.from("leads").insert({
+        full_name: leadName.trim(),
+        email: leadEmail.trim().toLowerCase(),
+        clinic_name: leadClinic.trim(),
+        page_path: window.location.pathname,
+        source: "homepage_popup",
+      });
+
+      if (error) {
+        toast.error(error.message);
+        return;
+      }
+
+      toast.success("Thanks. We’ll reach out soon.");
+      setLeadOpen(false);
+      setLeadName("");
+      setLeadEmail("");
+      setLeadClinic("");
+    };
+
+    void submitLead();
   };
 
   if (loading) {
