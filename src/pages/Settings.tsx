@@ -9,10 +9,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { toast } from "sonner";
-import { Crown, Inbox, LockKeyhole, Mail, ShieldCheck, Tags } from "lucide-react";
-import type { Tables } from "@/integrations/supabase/types";
-
-type LeadRow = Tables<"leads">;
+import { Crown, LockKeyhole, ShieldCheck, Tags } from "lucide-react";
 
 const SettingsPage = () => {
   const { user, profile, hasOwnerSecurityPin, isPlatformOwner, claimPlatformOwnerAccess, setOwnerSecurityPin } = useAuth();
@@ -25,39 +22,10 @@ const SettingsPage = () => {
   );
   const [savingGuardrail, setSavingGuardrail] = useState(false);
   const [claimingPlatformOwner, setClaimingPlatformOwner] = useState(false);
-  const [leads, setLeads] = useState<LeadRow[]>([]);
-  const [loadingLeads, setLoadingLeads] = useState(false);
 
   useEffect(() => {
     setMaximumDiscountPercentage(String(profile?.minimum_profit_retention_percentage ?? 0));
   }, [profile?.minimum_profit_retention_percentage]);
-
-  useEffect(() => {
-    if (!isPlatformOwner) {
-      setLeads([]);
-      return;
-    }
-
-    const loadLeads = async () => {
-      setLoadingLeads(true);
-      const { data, error } = await supabase
-        .from("leads")
-        .select("*")
-        .order("created_at", { ascending: false })
-        .limit(8);
-
-      setLoadingLeads(false);
-
-      if (error) {
-        toast.error(error.message);
-        return;
-      }
-
-      setLeads((data ?? []) as LeadRow[]);
-    };
-
-    void loadLeads();
-  }, [isPlatformOwner]);
 
   const pinMismatch = newPin.length < 4 || newPin !== confirmPin;
   const configuredMaximumDiscountPercentage = clampPercent(
@@ -150,62 +118,12 @@ const SettingsPage = () => {
                 <p className="text-sm text-muted-foreground">
                   Once claimed, the `Platform Accounts` page appears only for the platform owner and is hidden from normal clinic accounts.
                 </p>
+                <p className="text-sm text-muted-foreground">
+                  The lead inbox now lives in `Platform Accounts`, so only the creator sees new homepage inquiries there.
+                </p>
                 <Button type="button" onClick={handleClaimPlatformOwner} disabled={claimingPlatformOwner}>
                   {claimingPlatformOwner ? "Claiming..." : "Claim Platform Owner Access"}
                 </Button>
-              </CardContent>
-            </Card>
-          )}
-
-          {isPlatformOwner && (
-            <Card className="border-primary/20 xl:col-span-2">
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <Inbox className="h-5 w-5" />
-                  Lead Inbox
-                </CardTitle>
-                <CardDescription>
-                  New inquiries from the homepage popup arrive here for the system creator to review.
-                </CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                {loadingLeads ? (
-                  <div className="text-sm text-muted-foreground">Loading leads...</div>
-                ) : leads.length === 0 ? (
-                  <div className="rounded-xl border bg-muted/40 p-4 text-sm text-muted-foreground">
-                    No leads yet. Once someone submits the popup on the homepage, their details will appear here.
-                  </div>
-                ) : (
-                  <div className="space-y-3">
-                    {leads.map((lead) => (
-                      <div key={lead.id} className="rounded-2xl border bg-background p-4 shadow-sm">
-                        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-                          <div className="space-y-1">
-                            <div className="flex flex-wrap items-center gap-2">
-                              <p className="font-semibold text-foreground">{lead.full_name}</p>
-                              <span className="rounded-full bg-primary/10 px-2 py-0.5 text-xs font-medium text-primary">
-                                {lead.status}
-                              </span>
-                            </div>
-                            <div className="flex flex-wrap items-center gap-3 text-sm text-muted-foreground">
-                              <span className="inline-flex items-center gap-1">
-                                <Mail className="h-4 w-4" />
-                                {lead.email}
-                              </span>
-                              <span>{lead.clinic_name}</span>
-                            </div>
-                          </div>
-                          <div className="text-sm text-muted-foreground">
-                            {new Date(lead.created_at).toLocaleString([], {
-                              dateStyle: "medium",
-                              timeStyle: "short",
-                            })}
-                          </div>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                )}
               </CardContent>
             </Card>
           )}

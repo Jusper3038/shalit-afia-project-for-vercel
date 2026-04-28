@@ -9,8 +9,9 @@ import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { toast } from "sonner";
-import { Power, ShieldCheck, Trash2, Users as UsersIcon } from "lucide-react";
+import { Inbox, Mail, Power, ShieldCheck, Trash2, Users as UsersIcon } from "lucide-react";
 import type { Enums } from "@/integrations/supabase/types";
+import type { Tables } from "@/integrations/supabase/types";
 
 type SystemUser = {
   clinic_name: string;
@@ -25,6 +26,8 @@ type SystemUser = {
   user_id: string;
 };
 
+type LeadRow = Tables<"leads">;
+
 const UsersPage = () => {
   const { isPlatformOwner, claimPlatformOwnerAccess, user } = useAuth();
   const [users, setUsers] = useState<SystemUser[]>([]);
@@ -33,6 +36,8 @@ const UsersPage = () => {
   const [updatingStatusUserId, setUpdatingStatusUserId] = useState<string | null>(null);
   const [claimingAccess, setClaimingAccess] = useState(false);
   const [searchTerm, setSearchTerm] = useState("");
+  const [leads, setLeads] = useState<LeadRow[]>([]);
+  const [loadingLeads, setLoadingLeads] = useState(false);
 
   const fetchUsers = async () => {
     setLoading(true);
@@ -47,9 +52,31 @@ const UsersPage = () => {
     setUsers(data ?? []);
   };
 
+  const fetchLeads = async () => {
+    setLoadingLeads(true);
+    const { data, error } = await supabase
+      .from("leads")
+      .select("*")
+      .order("created_at", { ascending: false })
+      .limit(8);
+
+    setLoadingLeads(false);
+
+    if (error) {
+      toast.error(error.message);
+      return;
+    }
+
+    setLeads((data ?? []) as LeadRow[]);
+  };
+
   useEffect(() => {
     if (isPlatformOwner) {
       fetchUsers();
+      fetchLeads();
+    } else {
+      setUsers([]);
+      setLeads([]);
     }
   }, [isPlatformOwner]);
 
@@ -212,6 +239,57 @@ const UsersPage = () => {
             </CardContent>
           </Card>
         </div>
+
+        <Card className="border-primary/20">
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <Inbox className="h-5 w-5" />
+              Lead Inbox
+            </CardTitle>
+            <CardDescription>
+              Homepage leads are visible here only for the creator of the system, not for clinic owners.
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            {loadingLeads ? (
+              <div className="text-sm text-muted-foreground">Loading leads...</div>
+            ) : leads.length === 0 ? (
+              <div className="rounded-xl border bg-muted/40 p-4 text-sm text-muted-foreground">
+                No leads yet. Once someone submits the popup on the homepage, their details will appear here.
+              </div>
+            ) : (
+              <div className="space-y-3">
+                {leads.map((lead) => (
+                  <div key={lead.id} className="rounded-2xl border bg-background p-4 shadow-sm">
+                    <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                      <div className="space-y-1">
+                        <div className="flex flex-wrap items-center gap-2">
+                          <p className="font-semibold text-foreground">{lead.full_name}</p>
+                          <span className="rounded-full bg-primary/10 px-2 py-0.5 text-xs font-medium text-primary">
+                            {lead.status}
+                          </span>
+                        </div>
+                        <div className="flex flex-wrap items-center gap-3 text-sm text-muted-foreground">
+                          <span className="inline-flex items-center gap-1">
+                            <Mail className="h-4 w-4" />
+                            {lead.email}
+                          </span>
+                          <span>{lead.clinic_name}</span>
+                        </div>
+                      </div>
+                      <div className="text-sm text-muted-foreground">
+                        {new Date(lead.created_at).toLocaleString([], {
+                          dateStyle: "medium",
+                          timeStyle: "short",
+                        })}
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </CardContent>
+        </Card>
 
         <Card>
           <CardHeader>
