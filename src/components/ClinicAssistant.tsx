@@ -11,7 +11,6 @@ import type { Tables } from "@/integrations/supabase/types";
 import { getClinicDayKey, getClinicWeekStartKey, getMonthLabel, getTransactionSaleDay, getTransactionSaleMonth, getTransactionSaleYear } from "@/lib/reporting";
 import { getDaysUntilExpiry, isExpiredDrug, isExpiringSoonDrug } from "@/lib/inventory";
 
-const OLLAMA_BASE_URL = import.meta.env.VITE_OLLAMA_BASE_URL || "http://localhost:11434";
 const OLLAMA_MODEL = import.meta.env.VITE_OLLAMA_MODEL || "llama3.1:8b";
 
 type Message = {
@@ -46,7 +45,7 @@ const ClinicAssistant = () => {
     {
       id: "welcome",
       role: "assistant",
-      text: "I can summarize daily operations, highlight stock risks, and suggest revenue improvements. Ask for today's report, best-selling items, profit, payments, or growth ideas. When Ollama is available, I’ll use a smarter local model for richer answers.",
+      text: "I can summarize daily operations, highlight stock risks, and suggest revenue improvements. Ask for today's report, best-selling items, profit, payments, or growth ideas. When Ollama is available, I'll use a smarter model for richer answers.",
     },
   ]);
   const [data, setData] = useState<AssistantData>({
@@ -186,37 +185,28 @@ const ClinicAssistant = () => {
         content: message.text,
       }));
 
-    const response = await fetch(`${OLLAMA_BASE_URL}/api/chat`, {
+    const response = await fetch("/api/ollama", {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
       },
       body: JSON.stringify({
         model: OLLAMA_MODEL,
-        stream: false,
-        messages: [
-          {
-            role: "system",
-            content: `${buildSystemPrompt()}\n\nClinic snapshot:\n${buildClinicSnapshot()}`,
-          },
-          ...recentMessages,
-          {
-            role: "user",
-            content: prompt,
-          },
-        ],
+        snapshot: buildClinicSnapshot(),
+        prompt,
+        messages: recentMessages,
       }),
     });
 
     if (!response.ok) {
-      throw new Error(`Ollama request failed with status ${response.status}`);
+      throw new Error(`Assistant request failed with status ${response.status}`);
     }
 
-    const data = (await response.json()) as { message?: { content?: string } };
-    const content = data.message?.content?.trim();
+    const data = (await response.json()) as { reply?: string };
+    const content = data.reply?.trim();
 
     if (!content) {
-      throw new Error("Ollama returned an empty response.");
+      throw new Error("Assistant returned an empty response.");
     }
 
     return content;
@@ -346,6 +336,14 @@ const ClinicAssistant = () => {
   const handlePrompt = (prompt: string) => {
     const trimmed = prompt.trim();
     if (!trimmed) return;
+    const nextMessages = [
+      ...messages,
+      {
+        id: `user-${Date.now()}`,
+        role: "user" as const,
+        text: trimmed,
+      },
+    ];
 
     const userMessage: Message = {
       id: `user-${Date.now()}`,
@@ -365,7 +363,7 @@ const ClinicAssistant = () => {
     const runAssistant = async () => {
       setSending(true);
       try {
-        const reply = await callOllama(trimmed, [...messages, userMessage]);
+        const reply = await callOllama(trimmed, nextMessages);
         setMessages((current) =>
           current.map((message) =>
             message.id === assistantMessage.id ? { ...message, text: reply } : message,
