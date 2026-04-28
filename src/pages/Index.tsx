@@ -1,4 +1,5 @@
 import { Link, Navigate } from "react-router-dom";
+import { useEffect, useState } from "react";
 import {
   ArrowRight,
   BarChart3,
@@ -11,9 +12,20 @@ import {
   Stethoscope,
   Users,
 } from "lucide-react";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
 import { Card, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { useAuth } from "@/contexts/AuthContext";
+import { toast } from "sonner";
 
 const outcomes = [
   {
@@ -82,6 +94,38 @@ const heroImages = [
 
 const Index = () => {
   const { session, loading, role } = useAuth();
+  const [leadOpen, setLeadOpen] = useState(false);
+  const [leadName, setLeadName] = useState("");
+  const [leadEmail, setLeadEmail] = useState("");
+  const [leadClinic, setLeadClinic] = useState("");
+
+  useEffect(() => {
+    if (session) return;
+
+    const seen = window.localStorage.getItem("shalit-afia-lead-popup-seen");
+    if (seen) return;
+
+    const timer = window.setTimeout(() => {
+      setLeadOpen(true);
+      window.localStorage.setItem("shalit-afia-lead-popup-seen", "1");
+    }, 4500);
+
+    return () => window.clearTimeout(timer);
+  }, [session]);
+
+  const handleLeadSubmit = (e: React.FormEvent<HTMLFormElement>) => {
+    e.preventDefault();
+    if (!leadName.trim() || !leadEmail.trim() || !leadClinic.trim()) {
+      toast.error("Please fill in your name, email, and clinic.");
+      return;
+    }
+
+    toast.success("Thanks. We’ll reach out soon.");
+    setLeadOpen(false);
+    setLeadName("");
+    setLeadEmail("");
+    setLeadClinic("");
+  };
 
   if (loading) {
     return (
@@ -142,10 +186,10 @@ const Index = () => {
       </header>
 
       <main className="bg-white">
-        <section className="relative">
+        <section className="relative -mt-10 lg:-mt-14">
           <div className="absolute inset-0 -z-10 bg-[radial-gradient(circle_at_15%_20%,rgba(14,165,233,0.08),transparent_24%),radial-gradient(circle_at_85%_18%,rgba(59,130,246,0.08),transparent_20%)]" />
-          <div className="mx-auto grid max-w-7xl gap-12 px-4 pb-14 pt-4 sm:px-6 lg:grid-cols-[1.05fr_0.95fr] lg:items-start lg:px-8 lg:pb-20 lg:pt-4">
-            <div className="flex flex-col justify-start pt-1 lg:pt-3">
+          <div className="mx-auto grid max-w-7xl gap-12 px-4 pb-14 pt-0 sm:px-6 lg:grid-cols-[1.05fr_0.95fr] lg:items-start lg:px-8 lg:pb-18 lg:pt-0">
+            <div className="flex flex-col justify-start pt-0 lg:pt-2">
               <div className="mb-4 inline-flex w-fit items-center rounded-full border border-sky-100 bg-sky-50 px-4 py-2 text-sm font-medium text-primary">
                 Clinic story starts here
               </div>
@@ -169,6 +213,9 @@ const Index = () => {
                 <Button asChild size="lg" variant="outline" className="border-primary/20 bg-white/80 backdrop-blur">
                   <a href="#platform">Explore the workflow</a>
                 </Button>
+                <Button type="button" size="lg" variant="ghost" className="text-primary" onClick={() => setLeadOpen(true)}>
+                  Get updates
+                </Button>
               </div>
 
               <div className="mt-8 grid gap-4 sm:grid-cols-3">
@@ -190,7 +237,7 @@ const Index = () => {
                   <img
                     src={heroImages[0].src}
                     alt={heroImages[0].alt}
-                    className="h-[470px] w-full object-cover"
+                    className="h-[420px] w-full object-cover"
                     loading="eager"
                     decoding="async"
                   />
@@ -205,7 +252,7 @@ const Index = () => {
                     <img
                       src={heroImages[1].src}
                       alt={heroImages[1].alt}
-                      className="h-[222px] w-full object-cover"
+                      className="h-[190px] w-full object-cover"
                       loading="eager"
                       decoding="async"
                     />
@@ -232,7 +279,7 @@ const Index = () => {
                     <img
                       src={heroImages[3].src}
                       alt={heroImages[3].alt}
-                      className="h-[230px] w-full object-cover"
+                      className="h-[200px] w-full object-cover"
                       loading="lazy"
                       decoding="async"
                     />
@@ -246,7 +293,7 @@ const Index = () => {
                     <img
                       src={heroImages[2].src}
                       alt={heroImages[2].alt}
-                      className="h-[230px] w-full object-cover"
+                      className="h-[200px] w-full object-cover"
                       loading="lazy"
                       decoding="async"
                     />
@@ -464,6 +511,54 @@ const Index = () => {
           </div>
         </section>
       </main>
+
+      <Dialog open={leadOpen} onOpenChange={setLeadOpen}>
+        <DialogContent className="max-w-md border-sky-100 bg-white">
+          <DialogHeader>
+            <DialogTitle className="text-2xl">See the clinic story up close</DialogTitle>
+            <DialogDescription>
+              Leave your details and we’ll send the next step for your clinic.
+            </DialogDescription>
+          </DialogHeader>
+
+          <form className="space-y-4" onSubmit={handleLeadSubmit}>
+            <div className="space-y-2">
+              <Label htmlFor="lead-name">Your name</Label>
+              <Input
+                id="lead-name"
+                value={leadName}
+                onChange={(e) => setLeadName(e.target.value)}
+                placeholder="Dr. Amina"
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="lead-email">Email</Label>
+              <Input
+                id="lead-email"
+                type="email"
+                value={leadEmail}
+                onChange={(e) => setLeadEmail(e.target.value)}
+                placeholder="you@clinic.com"
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="lead-clinic">Clinic name</Label>
+              <Input
+                id="lead-clinic"
+                value={leadClinic}
+                onChange={(e) => setLeadClinic(e.target.value)}
+                placeholder="Shalit Afia Clinic"
+              />
+            </div>
+
+            <DialogFooter>
+              <Button type="submit" className="w-full">
+                Send me the story
+              </Button>
+            </DialogFooter>
+          </form>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 };
