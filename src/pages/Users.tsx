@@ -3,15 +3,14 @@ import { supabase } from "@/integrations/supabase/client";
 import { logAudit } from "@/lib/audit";
 import { useAuth } from "@/contexts/AuthContext";
 import AppLayout from "@/components/AppLayout";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { toast } from "sonner";
 import { Inbox, Mail, Power, ShieldCheck, Trash2, Users as UsersIcon } from "lucide-react";
-import type { Enums } from "@/integrations/supabase/types";
-import type { Tables } from "@/integrations/supabase/types";
+import type { Enums, Tables } from "@/integrations/supabase/types";
 
 type SystemUser = {
   clinic_name: string;
@@ -29,27 +28,30 @@ type SystemUser = {
 type LeadRow = Tables<"leads">;
 
 const UsersPage = () => {
-  const { isPlatformOwner, claimPlatformOwnerAccess, user } = useAuth();
+  const { claimPlatformOwnerAccess, user } = useAuth();
+  const [creatorUnlocked, setCreatorUnlocked] = useState(
+    () => sessionStorage.getItem("creator_view_unlocked") === "true"
+  );
   const [users, setUsers] = useState<SystemUser[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [leads, setLeads] = useState<LeadRow[]>([]);
+  const [searchTerm, setSearchTerm] = useState("");
+  const [loadingUsers, setLoadingUsers] = useState(false);
+  const [loadingLeads, setLoadingLeads] = useState(false);
+  const [claimingAccess, setClaimingAccess] = useState(false);
   const [deletingUserId, setDeletingUserId] = useState<string | null>(null);
   const [updatingStatusUserId, setUpdatingStatusUserId] = useState<string | null>(null);
-  const [claimingAccess, setClaimingAccess] = useState(false);
-  const [searchTerm, setSearchTerm] = useState("");
-  const [leads, setLeads] = useState<LeadRow[]>([]);
-  const [loadingLeads, setLoadingLeads] = useState(false);
 
   const fetchUsers = async () => {
-    setLoading(true);
+    setLoadingUsers(true);
     const { data, error } = await supabase.rpc("get_platform_accounts");
-    setLoading(false);
+    setLoadingUsers(false);
 
     if (error) {
       toast.error(error.message);
       return;
     }
 
-    setUsers(data ?? []);
+    setUsers((data ?? []) as SystemUser[]);
   };
 
   const fetchLeads = async () => {
@@ -59,7 +61,6 @@ const UsersPage = () => {
       .select("*")
       .order("created_at", { ascending: false })
       .limit(8);
-
     setLoadingLeads(false);
 
     if (error) {
@@ -71,25 +72,41 @@ const UsersPage = () => {
   };
 
   useEffect(() => {
-    if (isPlatformOwner) {
-      fetchUsers();
-      fetchLeads();
-    } else {
+    if (!creatorUnlocked) {
       setUsers([]);
       setLeads([]);
+      return;
     }
-  }, [isPlatformOwner]);
 
-  const handleDelete = async (user: SystemUser) => {
+    void fetchUsers();
+    void fetchLeads();
+  }, [creatorUnlocked]);
+
+  const handleOpenCreatorView = async () => {
+    setClaimingAccess(true);
+    const { error } = await claimPlatformOwnerAccess();
+    setClaimingAccess(false);
+
+    if (error) {
+      toast.error(error);
+      return;
+    }
+
+    sessionStorage.setItem("creator_view_unlocked", "true");
+    setCreatorUnlocked(true);
+    toast.success("Creator view unlocked.");
+  };
+
+  const handleDelete = async (account: SystemUser) => {
     const confirmed = window.confirm(
-      `Delete ${user.name || user.email}? This removes the account and all records linked to it.`
+      `Delete ${account.name || account.email}? This removes the account and all records linked to it.`
     );
 
     if (!confirmed) return;
 
-    setDeletingUserId(user.user_id);
+    setDeletingUserId(account.user_id);
     const { error } = await supabase.rpc("platform_delete_account", {
-      p_user_id: user.user_id,
+      p_user_id: account.user_id,
     });
     setDeletingUserId(null);
 
@@ -98,9 +115,9 @@ const UsersPage = () => {
       return;
     }
 
-    await logAudit("Deleted platform account", `Deleted ${user.email}`);
+    await logAudit("Deleted platform account", `Deleted ${account.email}`);
     toast.success("User account deleted.");
-    fetchUsers();
+    void fetchUsers();
   };
 
   const handleToggleStatus = async (account: SystemUser) => {
@@ -130,33 +147,16 @@ const UsersPage = () => {
       `${nextActiveState ? "Reactivated" : "Deactivated"} ${account.email}`
     );
     toast.success(`Account ${nextActiveState ? "reactivated" : "deactivated"}.`);
-    fetchUsers();
+    void fetchUsers();
   };
 
-  const handleClaimPlatformOwner = async () => {
-    setClaimingAccess(true);
-    const { error } = await claimPlatformOwnerAccess();
-    setClaimingAccess(false);
-
-    if (error) {
-      toast.error(error);
-      return;
-    }
-
-    toast.success("Platform owner access enabled for this account.");
-    fetchUsers();
-  };
-
-  const filteredUsers = users.filter((user) => {
+  const filteredUsers = users.filter((account) => {
     const needle = searchTerm.trim().toLowerCase();
     if (!needle) return true;
 
-    return [
-      user.name,
-      user.email,
-      user.clinic_name,
-      user.role,
-    ].some((value) => value?.toLowerCase().includes(needle));
+    return [account.name, account.email, account.clinic_name, account.role].some((value) =>
+      value?.toLowerCase().includes(needle)
+    );
   });
 
   return (
@@ -166,45 +166,40 @@ const UsersPage = () => {
           <div>
             <h2 className="text-2xl font-bold">Platform Accounts</h2>
             <p className="text-sm text-muted-foreground">
-              Creator-only view of every clinic account using this system. You can deactivate or delete accounts here.
+              Creator-only view of every clinic account using this system.
             </p>
           </div>
-          {isPlatformOwner && (
-            <Input
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-              placeholder="Search by name, email, clinic, or role"
-              className="w-full lg:w-[320px]"
-            />
-          )}
+
+          <Input
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+            placeholder="Search by name, email, clinic, or role"
+            className="w-full lg:w-[320px]"
+            disabled={!creatorUnlocked}
+          />
         </div>
 
-        {!isPlatformOwner && (
+        {!creatorUnlocked ? (
           <Card className="border-primary/20">
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
                 <ShieldCheck className="h-5 w-5" />
-                Platform Owner Access
+                Creator Access
               </CardTitle>
+              <CardDescription>
+                Open the creator view to load platform accounts and homepage leads.
+              </CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
               <p className="text-sm text-muted-foreground">
-                This page is reserved for the creator of the system to manage every account globally.
-              </p>
-              <p className="text-sm text-muted-foreground">
                 Current account: <span className="font-medium text-foreground">{user?.email || "Unknown user"}</span>
               </p>
-              <div className="rounded-2xl border border-dashed bg-muted/30 p-4 text-sm text-muted-foreground">
-                The first successful claim creates the creator account for this system and unlocks the page.
-              </div>
-              <Button type="button" onClick={handleClaimPlatformOwner} disabled={claimingAccess}>
-                {claimingAccess ? "Claiming..." : "Claim Platform Owner Access"}
+              <Button type="button" onClick={handleOpenCreatorView} disabled={claimingAccess}>
+                {claimingAccess ? "Opening..." : "Open Creator View"}
               </Button>
             </CardContent>
           </Card>
-        )}
-
-        {isPlatformOwner && (
+        ) : (
           <>
             <div className="grid gap-4 sm:grid-cols-3">
               <Card>
@@ -290,7 +285,7 @@ const UsersPage = () => {
                 <CardTitle>User Directory</CardTitle>
               </CardHeader>
               <CardContent className="p-0">
-                {loading ? (
+                {loadingUsers ? (
                   <div className="flex h-32 items-center justify-center">
                     <div className="h-6 w-6 animate-spin rounded-full border-b-2 border-primary" />
                   </div>
@@ -310,45 +305,43 @@ const UsersPage = () => {
                       </TableRow>
                     </TableHeader>
                     <TableBody>
-                      {filteredUsers.map((user) => (
-                        <TableRow key={user.user_id}>
-                          <TableCell className="font-medium">{user.name || "-"}</TableCell>
-                          <TableCell>{user.email || "-"}</TableCell>
-                          <TableCell>{user.clinic_name || "-"}</TableCell>
+                      {filteredUsers.map((account) => (
+                        <TableRow key={account.user_id}>
+                          <TableCell className="font-medium">{account.name || "-"}</TableCell>
+                          <TableCell>{account.email || "-"}</TableCell>
+                          <TableCell>{account.clinic_name || "-"}</TableCell>
                           <TableCell>
-                            <Badge variant={user.role === "admin" ? "default" : "secondary"}>
-                              {user.role}
-                            </Badge>
+                            <Badge variant={account.role === "admin" ? "default" : "secondary"}>{account.role}</Badge>
                           </TableCell>
                           <TableCell>
-                            <Badge variant={user.is_active ? "default" : "destructive"}>
-                              {user.is_active ? "Active" : "Deactivated"}
+                            <Badge variant={account.is_active ? "default" : "destructive"}>
+                              {account.is_active ? "Active" : "Deactivated"}
                             </Badge>
                           </TableCell>
-                          <TableCell>{new Date(user.created_at).toLocaleDateString()}</TableCell>
+                          <TableCell>{new Date(account.created_at).toLocaleDateString()}</TableCell>
                           <TableCell className="text-right">
                             <div className="flex justify-end gap-2">
                               <Button
                                 type="button"
                                 variant="outline"
                                 size="sm"
-                                onClick={() => handleToggleStatus(user)}
-                                disabled={updatingStatusUserId === user.user_id}
+                                onClick={() => handleToggleStatus(account)}
+                                disabled={updatingStatusUserId === account.user_id}
                               >
                                 <Power className="mr-2 h-4 w-4" />
-                                {updatingStatusUserId === user.user_id
+                                {updatingStatusUserId === account.user_id
                                   ? "Saving..."
-                                  : user.is_active ? "Deactivate" : "Reactivate"}
+                                  : account.is_active ? "Deactivate" : "Reactivate"}
                               </Button>
                               <Button
                                 type="button"
                                 variant="destructive"
                                 size="sm"
-                                onClick={() => handleDelete(user)}
-                                disabled={deletingUserId === user.user_id}
+                                onClick={() => handleDelete(account)}
+                                disabled={deletingUserId === account.user_id}
                               >
                                 <Trash2 className="mr-2 h-4 w-4" />
-                                {deletingUserId === user.user_id ? "Deleting..." : "Delete"}
+                                {deletingUserId === account.user_id ? "Deleting..." : "Delete"}
                               </Button>
                             </div>
                           </TableCell>
