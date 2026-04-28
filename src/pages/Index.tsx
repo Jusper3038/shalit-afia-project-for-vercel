@@ -70,26 +70,42 @@ const glowPoints = [
   },
 ];
 
-const heroImages = [
+const dashboardSamples = [
   {
-    src: "https://images.pexels.com/photos/4989168/pexels-photo-4989168.jpeg?cs=srgb&dl=pexels-ivan-s-4989168.jpg&fm=jpg",
-    alt: "Smiling doctor leaning forward in a bright modern workspace",
-    caption: "The dashboard opens with a clinician who already feels in control",
+    title: "Owner dashboard",
+    eyebrow: "Today",
+    stat: "24 visits in motion",
+    detail: "A single screen for appointments, queue pressure, and the work that needs attention first.",
+    bars: [82, 64, 91, 58],
+    tone: "from-sky-50 to-white",
+    icon: LayoutDashboard,
   },
   {
-    src: "https://images.pexels.com/photos/8376333/pexels-photo-8376333.jpeg?cs=srgb&dl=pexels-tima-miroshnichenko-8376333.jpg&fm=jpg",
-    alt: "Smiling clinician in a white coat speaking warmly at a desk",
-    caption: "A patient record that stays easy to read, update, and trust",
+    title: "Billing flow",
+    eyebrow: "Payments",
+    stat: "18 cleared today",
+    detail: "See what is paid, what is pending, and what needs a follow-up without opening another tab.",
+    bars: [45, 72, 88, 66],
+    tone: "from-blue-50 to-white",
+    icon: CreditCard,
   },
   {
-    src: "https://images.pexels.com/photos/7578806/pexels-photo-7578806.jpeg?cs=srgb&dl=pexels-cottonbro-7578806.jpg&fm=jpg",
-    alt: "Smiling doctor in conversation with a patient in a bright clinic",
-    caption: "One conversation moving cleanly through the visit flow",
+    title: "Lead inbox",
+    eyebrow: "New",
+    stat: "8 inquiries waiting",
+    detail: "Homepage leads land in one place so the team can respond before the day gets noisy.",
+    bars: [64, 48, 76, 84],
+    tone: "from-cyan-50 to-white",
+    icon: HeartHandshake,
   },
   {
-    src: "https://images.pexels.com/photos/19963186/pexels-photo-19963186.jpeg?cs=srgb&dl=pexels-tessy-agbonome-521343232-19963186.jpg&fm=jpg",
-    alt: "Smiling female doctor in blue scrubs on a white background",
-    caption: "A bright, white-background moment that mirrors the app's clarity",
+    title: "Inventory watch",
+    eyebrow: "Alerts",
+    stat: "3 low-stock items",
+    detail: "Drugs and supplies stay visible before they become a last-minute problem.",
+    bars: [38, 60, 52, 78],
+    tone: "from-slate-50 to-white",
+    icon: BarChart3,
   },
 ];
 
@@ -135,7 +151,7 @@ const Index = () => {
         return;
       }
 
-      toast.success("Thanks. We’ll reach out soon.");
+      toast.success("Thanks. We'll reach out soon.");
       setLeadOpen(false);
       setLeadName("");
       setLeadEmail("");
@@ -178,8 +194,8 @@ const Index = () => {
             <a href="#outcomes" className="transition hover:text-foreground">
               Outcomes
             </a>
-            <a href="#gallery" className="transition hover:text-foreground">
-              Gallery
+            <a href="#solutions" className="transition hover:text-foreground">
+              Solutions
             </a>
             <a href="#platform" className="transition hover:text-foreground">
               Platform
@@ -209,22 +225,22 @@ const Index = () => {
           <div className="mx-auto grid max-w-7xl gap-12 px-4 pb-14 pt-0 sm:px-6 lg:grid-cols-[1.05fr_0.95fr] lg:items-start lg:px-8 lg:pb-18 lg:pt-0">
             <div className="flex flex-col justify-start pt-0 lg:pt-2">
               <div className="mb-4 inline-flex w-fit items-center rounded-full border border-sky-100 bg-sky-50 px-4 py-2 text-sm font-medium text-primary">
-                Clinic story starts here
+                Dashboard story starts here
               </div>
 
               <h1 className="max-w-2xl text-4xl font-semibold tracking-tight text-foreground sm:text-5xl lg:text-6xl">
-                A bright white homepage with blue energy and a story that feels easy to follow.
+                A clinic homepage that shows the software behind the calm.
               </h1>
 
               <p className="mt-6 max-w-2xl text-lg leading-8 text-muted-foreground">
-                Shalit Afia brings patients, drugs, billing, payments, and reporting into one calm workflow so the whole
-                clinic feels easier to understand, easier to trust, and easier to love using.
+                Shalit Afia brings patient records, billing, inventory, lead capture, payments, and owner controls into
+                one clear dashboard so the clinic feels organized before anyone signs in.
               </p>
 
               <div className="mt-8 flex flex-col gap-3 sm:flex-row">
                 <Button asChild size="lg" className="shadow-lg shadow-primary/20">
-                  <a href="#gallery">
-                    See the story
+                  <a href="#solutions">
+                    See the dashboard
                     <ArrowRight className="h-4 w-4" />
                   </a>
                 </Button>
@@ -232,7 +248,7 @@ const Index = () => {
                   <a href="#platform">Explore the workflow</a>
                 </Button>
                 <Button type="button" size="lg" variant="ghost" className="text-primary" onClick={() => setLeadOpen(true)}>
-                  Get updates
+                  Request a demo
                 </Button>
               </div>
 
@@ -250,122 +266,179 @@ const Index = () => {
               <div className="absolute -left-6 top-8 h-28 w-28 rounded-full bg-sky-100 blur-3xl" />
               <div className="absolute -right-8 bottom-10 h-32 w-32 rounded-full bg-blue-100 blur-3xl" />
 
-              <div className="relative grid gap-5 sm:grid-cols-[1.1fr_0.9fr]">
-                <div className="overflow-hidden rounded-[30px] border border-sky-100 bg-white shadow-[0_30px_90px_rgba(59,130,246,0.08)] float-slow">
-                  <img
-                    src={heroImages[0].src}
-                    alt={heroImages[0].alt}
-                    className="h-[420px] w-full object-cover"
-                    loading="eager"
-                    decoding="async"
-                  />
-                  <div className="p-4">
-                    <p className="text-sm font-semibold text-foreground">{heroImages[0].caption}</p>
-                    <p className="mt-1 text-sm text-muted-foreground">The first glance says the clinic is already organized.</p>
+              <div className="grid gap-5">
+                <div className="overflow-hidden rounded-[32px] border border-sky-100 bg-white shadow-[0_30px_90px_rgba(59,130,246,0.08)]">
+                  <div className="border-b border-sky-100 px-6 py-5">
+                    <div className="flex items-center justify-between gap-4">
+                      <div>
+                        <p className="text-sm font-semibold uppercase tracking-[0.24em] text-primary">Owner dashboard</p>
+                        <h2 className="mt-2 text-2xl font-semibold tracking-tight text-foreground">The day, already organized</h2>
+                      </div>
+                      <div className="rounded-full border border-sky-100 bg-sky-50 px-3 py-1 text-xs font-semibold uppercase tracking-[0.2em] text-primary">
+                        Live view
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="grid gap-5 p-6 xl:grid-cols-[1.1fr_0.9fr]">
+                    <div className="rounded-[28px] bg-[linear-gradient(180deg,#f8fcff_0%,#ffffff_100%)] p-5">
+                      <div className="grid gap-4 sm:grid-cols-3">
+                        <div className="rounded-2xl border border-sky-100 bg-white p-4 shadow-sm">
+                          <p className="text-xs font-semibold uppercase tracking-[0.2em] text-primary">Queue</p>
+                          <p className="mt-2 text-2xl font-semibold text-foreground">24</p>
+                          <p className="mt-1 text-sm text-muted-foreground">Visits in motion</p>
+                        </div>
+                        <div className="rounded-2xl border border-sky-100 bg-white p-4 shadow-sm">
+                          <p className="text-xs font-semibold uppercase tracking-[0.2em] text-primary">Payments</p>
+                          <p className="mt-2 text-2xl font-semibold text-foreground">18</p>
+                          <p className="mt-1 text-sm text-muted-foreground">Cleared today</p>
+                        </div>
+                        <div className="rounded-2xl border border-sky-100 bg-white p-4 shadow-sm">
+                          <p className="text-xs font-semibold uppercase tracking-[0.2em] text-primary">Alerts</p>
+                          <p className="mt-2 text-2xl font-semibold text-foreground">3</p>
+                          <p className="mt-1 text-sm text-muted-foreground">Items to restock</p>
+                        </div>
+                      </div>
+
+                      <div className="mt-5 rounded-[24px] border border-sky-100 bg-white p-4">
+                        <div className="flex items-center justify-between">
+                          <div>
+                            <p className="text-sm font-semibold text-foreground">Today&apos;s rhythm</p>
+                            <p className="text-sm text-muted-foreground">A quick chart that shows the clinic moving forward.</p>
+                          </div>
+                          <BarChart3 className="h-5 w-5 text-primary" />
+                        </div>
+                        <div className="mt-5 flex items-end gap-3">
+                          {[82, 64, 91, 58, 76, 88].map((value, index) => (
+                            <div key={index} className="flex-1">
+                              <div
+                                className="rounded-t-2xl bg-gradient-to-t from-primary/70 to-sky-200"
+                                style={{ height: `${value}px` }}
+                              />
+                              <div className="mt-2 h-2 rounded-full bg-sky-100" />
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="grid gap-4">
+                      {dashboardSamples.slice(1).map((item) => {
+                        const Icon = item.icon;
+                        return (
+                          <div
+                            key={item.title}
+                            className={`rounded-[26px] border border-sky-100 bg-gradient-to-br ${item.tone} p-5 shadow-sm`}
+                          >
+                            <div className="flex items-center justify-between gap-3">
+                              <div className="flex items-center gap-3">
+                                <div className="flex h-11 w-11 items-center justify-center rounded-2xl border border-sky-100 bg-white text-primary shadow-sm">
+                                  <Icon className="h-5 w-5" />
+                                </div>
+                                <div>
+                                  <p className="text-xs font-semibold uppercase tracking-[0.2em] text-primary">{item.eyebrow}</p>
+                                  <h3 className="mt-1 text-lg font-semibold text-foreground">{item.title}</h3>
+                                </div>
+                              </div>
+                              <div className="rounded-full border border-sky-100 bg-white px-3 py-1 text-xs font-semibold text-primary">
+                                {item.stat}
+                              </div>
+                            </div>
+                            <p className="mt-4 text-sm leading-6 text-muted-foreground">{item.detail}</p>
+                            <div className="mt-4 grid grid-cols-4 gap-2">
+                              {item.bars.map((bar, index) => (
+                                <div key={index} className="flex h-16 items-end rounded-2xl bg-white p-2 shadow-inner">
+                                  <div
+                                    className="w-full rounded-full bg-gradient-to-t from-primary/80 to-sky-300"
+                                    style={{ height: `${bar}%` }}
+                                  />
+                                </div>
+                              ))}
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
                   </div>
                 </div>
 
-                <div className="grid gap-4">
-                  <div className="overflow-hidden rounded-[28px] border border-sky-100 bg-white shadow-[0_24px_70px_rgba(59,130,246,0.08)] float-fast">
-                    <img
-                      src={heroImages[1].src}
-                      alt={heroImages[1].alt}
-                      className="h-[190px] w-full object-cover"
-                      loading="eager"
-                      decoding="async"
-                    />
-                    <div className="p-4">
-                      <p className="text-sm font-semibold text-foreground">{heroImages[1].caption}</p>
-                      <p className="mt-1 text-sm text-muted-foreground">A clear record turns the next step into an easy one.</p>
-                    </div>
-                  </div>
-
-                  <div className="rounded-[28px] border border-sky-100 bg-sky-50 p-5 text-foreground shadow-sm">
-                    <div className="flex items-center gap-2 text-sm font-semibold uppercase tracking-[0.22em] text-primary">
-                      <HeartHandshake className="h-4 w-4" />
-                      Workflow lift
-                    </div>
-                    <p className="mt-3 text-2xl font-semibold leading-tight text-primary">Blue accents guide the eye without taking over the page.</p>
-                    <p className="mt-2 text-sm leading-6 text-muted-foreground">
-                      The visual language stays clean, bright, and uncluttered while the app carries the work.
-                    </p>
-                  </div>
-                </div>
-
-                <div className="sm:col-span-2 grid gap-4 sm:grid-cols-[0.9fr_1.1fr]">
-                  <div className="overflow-hidden rounded-[28px] border border-sky-100 bg-white shadow-[0_24px_70px_rgba(59,130,246,0.08)] float-fast">
-                    <img
-                      src={heroImages[3].src}
-                      alt={heroImages[3].alt}
-                      className="h-[200px] w-full object-cover"
-                      loading="lazy"
-                      decoding="async"
-                    />
-                    <div className="p-4">
-                      <p className="text-sm font-semibold text-foreground">{heroImages[3].caption}</p>
-                      <p className="mt-1 text-sm text-muted-foreground">This image now matches the page: white background, blue energy, clear story.</p>
-                    </div>
-                  </div>
-
-                  <div className="overflow-hidden rounded-[28px] border border-sky-100 bg-white shadow-[0_24px_70px_rgba(59,130,246,0.08)] float-slow">
-                    <img
-                      src={heroImages[2].src}
-                      alt={heroImages[2].alt}
-                      className="h-[200px] w-full object-cover"
-                      loading="lazy"
-                      decoding="async"
-                    />
-                    <div className="p-4">
-                      <p className="text-sm font-semibold text-foreground">{heroImages[2].caption}</p>
-                      <p className="mt-1 text-sm text-muted-foreground">A visit that moves cleanly from hello to handoff.</p>
-                    </div>
-                  </div>
+                <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+                  {dashboardSamples.map((item) => {
+                    const Icon = item.icon;
+                    return (
+                      <div
+                        key={item.title}
+                        className={`rounded-[26px] border border-sky-100 bg-gradient-to-br ${item.tone} p-5 shadow-sm transition hover:-translate-y-1 hover:shadow-lg`}
+                      >
+                        <div className="flex items-center gap-3">
+                          <div className="flex h-11 w-11 items-center justify-center rounded-2xl border border-sky-100 bg-white text-primary shadow-sm">
+                            <Icon className="h-5 w-5" />
+                          </div>
+                          <div>
+                            <p className="text-xs font-semibold uppercase tracking-[0.2em] text-primary">{item.eyebrow}</p>
+                            <h3 className="mt-1 text-lg font-semibold text-foreground">{item.title}</h3>
+                          </div>
+                        </div>
+                        <p className="mt-4 text-sm font-semibold text-foreground">{item.stat}</p>
+                        <p className="mt-2 text-sm leading-6 text-muted-foreground">{item.detail}</p>
+                      </div>
+                    );
+                  })}
                 </div>
               </div>
             </div>
           </div>
         </section>
 
-        <section id="gallery" className="border-y border-sky-100 bg-white py-14">
+        <section id="solutions" className="border-y border-sky-100 bg-white py-14">
           <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
             <div className="max-w-2xl">
-              <p className="text-sm font-semibold uppercase tracking-[0.24em] text-primary">Gallery</p>
+              <p className="text-sm font-semibold uppercase tracking-[0.24em] text-primary">Solutions</p>
               <h2 className="mt-3 text-3xl font-semibold tracking-tight text-foreground sm:text-4xl">
-                Four images, four parts of the story.
+                Dashboard samples that show the product at work.
               </h2>
               <p className="mt-4 text-base leading-7 text-muted-foreground">
-                Each photo ties back to a real product moment: a calmer check-in, a clearer patient view, a smoother handoff,
-                and a billing flow that closes the loop.
+                These sample views make the promise concrete: cleaner billing, visible inventory, lead capture, and owner
+                control, all in one place.
               </p>
             </div>
 
             <div className="mt-12 grid gap-6 md:grid-cols-2 xl:grid-cols-4">
-              {heroImages.map((image, index) => (
-                <div
-                  key={image.src}
-                  className="group overflow-hidden rounded-[28px] border border-sky-100 bg-white shadow-sm transition duration-300 hover:-translate-y-1 hover:shadow-xl"
-                >
-                  <div className="relative">
-                    <img
-                      src={image.src}
-                      alt={image.alt}
-                      className="h-72 w-full object-cover transition duration-500 group-hover:scale-[1.04]"
-                      loading="lazy"
-                      decoding="async"
-                    />
-                    <div className="absolute inset-0 bg-[linear-gradient(180deg,rgba(255,255,255,0)_40%,rgba(14,165,233,0.2)_100%)]" />
-                    <div className="absolute left-4 top-4 rounded-full border border-sky-100 bg-white/90 px-3 py-1 text-xs font-semibold text-primary shadow-sm">
-                      {index === 0 ? "Dashboard ready" : index === 1 ? "Record clarity" : index === 2 ? "Visit flow" : "Shared view"}
+              {dashboardSamples.map((sample) => {
+                const Icon = sample.icon;
+                return (
+                  <div
+                    key={sample.title}
+                    className={`group overflow-hidden rounded-[28px] border border-sky-100 bg-gradient-to-br ${sample.tone} shadow-sm transition duration-300 hover:-translate-y-1 hover:shadow-xl`}
+                  >
+                    <div className="border-b border-sky-100 p-5">
+                      <div className="flex items-center justify-between">
+                        <div className="flex h-11 w-11 items-center justify-center rounded-2xl border border-sky-100 bg-white text-primary shadow-sm">
+                          <Icon className="h-5 w-5" />
+                        </div>
+                        <div className="rounded-full border border-sky-100 bg-white px-3 py-1 text-xs font-semibold uppercase tracking-[0.2em] text-primary shadow-sm">
+                          {sample.eyebrow}
+                        </div>
+                      </div>
+                      <h3 className="mt-4 text-2xl font-semibold tracking-tight text-foreground">{sample.title}</h3>
+                      <p className="mt-2 text-sm font-semibold text-primary">{sample.stat}</p>
+                    </div>
+                    <div className="p-5">
+                      <p className="text-sm leading-6 text-muted-foreground">{sample.detail}</p>
+                      <div className="mt-5 grid grid-cols-4 gap-2">
+                        {sample.bars.map((bar, index) => (
+                          <div key={index} className="flex h-16 items-end rounded-2xl bg-white p-2 shadow-inner">
+                            <div
+                              className="w-full rounded-full bg-gradient-to-t from-primary/80 to-sky-300"
+                              style={{ height: `${bar}%` }}
+                            />
+                          </div>
+                        ))}
+                      </div>
                     </div>
                   </div>
-                  <div className="p-4">
-                    <p className="text-sm font-semibold text-foreground">{image.caption}</p>
-                    <p className="mt-1 text-sm text-muted-foreground">
-                      A visual cue that the software is quietly making the day easier behind the smile.
-                    </p>
-                  </div>
-                </div>
-              ))}
+                );
+              })}
             </div>
           </div>
         </section>
@@ -403,22 +476,53 @@ const Index = () => {
 
         <section id="platform" className="py-14">
           <div className="mx-auto grid max-w-7xl gap-12 px-4 sm:px-6 lg:grid-cols-[0.92fr_1.08fr] lg:px-8">
-            <div className="relative overflow-hidden rounded-[28px] border border-sky-100 bg-white shadow-[0_30px_80px_rgba(59,130,246,0.08)]">
-              <img
-                src={heroImages[2].src}
-                alt={heroImages[2].alt}
-                className="h-full min-h-[420px] w-full object-cover"
-                loading="lazy"
-                decoding="async"
-              />
-              <div className="absolute inset-x-0 bottom-0 bg-[linear-gradient(180deg,rgba(255,255,255,0)_0%,rgba(255,255,255,0.94)_55%,rgba(255,255,255,1)_100%)] p-6 sm:p-8">
-                <p className="text-sm font-semibold uppercase tracking-[0.24em] text-primary">Story</p>
+            <div className="overflow-hidden rounded-[28px] border border-sky-100 bg-white shadow-[0_30px_80px_rgba(59,130,246,0.08)]">
+              <div className="border-b border-sky-100 px-6 py-5">
+                <p className="text-sm font-semibold uppercase tracking-[0.24em] text-primary">Platform</p>
                 <h3 className="mt-3 max-w-lg text-2xl font-semibold leading-tight sm:text-3xl">
-                  The room feels lighter when the software keeps the work flowing and the people smiling.
+                  The room feels lighter when the software keeps the work flowing and the team can see the next step.
                 </h3>
                 <p className="mt-3 max-w-lg text-sm leading-6 text-muted-foreground">
                   A white canvas, blue accents, and one steady system behind the scenes.
                 </p>
+              </div>
+
+              <div className="grid gap-4 p-6 sm:grid-cols-2">
+                <div className="rounded-[24px] border border-sky-100 bg-sky-50 p-5">
+                  <div className="flex items-center justify-between">
+                    <p className="text-xs font-semibold uppercase tracking-[0.2em] text-primary">Billing</p>
+                    <CreditCard className="h-5 w-5 text-primary" />
+                  </div>
+                  <p className="mt-3 text-2xl font-semibold text-foreground">18 paid</p>
+                  <p className="mt-2 text-sm leading-6 text-muted-foreground">Less chasing. More clarity. A cleaner close to the day.</p>
+                </div>
+
+                <div className="rounded-[24px] border border-sky-100 bg-white p-5 shadow-sm">
+                  <div className="flex items-center justify-between">
+                    <p className="text-xs font-semibold uppercase tracking-[0.2em] text-primary">Lead inbox</p>
+                    <HeartHandshake className="h-5 w-5 text-primary" />
+                  </div>
+                  <p className="mt-3 text-2xl font-semibold text-foreground">8 new</p>
+                  <p className="mt-2 text-sm leading-6 text-muted-foreground">New interest captured and ready for follow-up.</p>
+                </div>
+
+                <div className="rounded-[24px] border border-sky-100 bg-white p-5 shadow-sm">
+                  <div className="flex items-center justify-between">
+                    <p className="text-xs font-semibold uppercase tracking-[0.2em] text-primary">Inventory</p>
+                    <BarChart3 className="h-5 w-5 text-primary" />
+                  </div>
+                  <p className="mt-3 text-2xl font-semibold text-foreground">3 alerts</p>
+                  <p className="mt-2 text-sm leading-6 text-muted-foreground">The shelf stays visible before it becomes a problem.</p>
+                </div>
+
+                <div className="rounded-[24px] border border-sky-100 bg-blue-50 p-5">
+                  <div className="flex items-center justify-between">
+                    <p className="text-xs font-semibold uppercase tracking-[0.2em] text-primary">Owner access</p>
+                    <LayoutDashboard className="h-5 w-5 text-primary" />
+                  </div>
+                  <p className="mt-3 text-2xl font-semibold text-foreground">PIN locked</p>
+                  <p className="mt-2 text-sm leading-6 text-muted-foreground">Creator-only settings stay guarded and easy to manage.</p>
+                </div>
               </div>
             </div>
 
@@ -533,9 +637,9 @@ const Index = () => {
       <Dialog open={leadOpen} onOpenChange={setLeadOpen}>
         <DialogContent className="max-w-md border-sky-100 bg-white">
           <DialogHeader>
-            <DialogTitle className="text-2xl">See the clinic story up close</DialogTitle>
+            <DialogTitle className="text-2xl">See the dashboard story up close</DialogTitle>
             <DialogDescription>
-              Leave your details and we’ll send the next step for your clinic.
+              Leave your details and we'll send the next step for your clinic.
             </DialogDescription>
           </DialogHeader>
 
@@ -571,7 +675,7 @@ const Index = () => {
 
             <DialogFooter>
               <Button type="submit" className="w-full">
-                Send me the story
+                Send me the demo
               </Button>
             </DialogFooter>
           </form>
