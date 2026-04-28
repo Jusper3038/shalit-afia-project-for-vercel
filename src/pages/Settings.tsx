@@ -13,7 +13,7 @@ import { Crown, LockKeyhole, ShieldCheck, Tags } from "lucide-react";
 
 const SettingsPage = () => {
   const { user, profile, hasOwnerSecurityPin, isPlatformOwner, claimPlatformOwnerAccess, setOwnerSecurityPin } = useAuth();
-  const [hasPlatformOwner, setHasPlatformOwner] = useState<boolean | null>(null);
+  const [canClaimPlatformOwner, setCanClaimPlatformOwner] = useState<boolean | null>(null);
   const [currentPin, setCurrentPin] = useState("");
   const [newPin, setNewPin] = useState("");
   const [confirmPin, setConfirmPin] = useState("");
@@ -29,18 +29,18 @@ const SettingsPage = () => {
   }, [profile?.minimum_profit_retention_percentage]);
 
   useEffect(() => {
-    const loadHasPlatformOwner = async () => {
-      const { data, error } = await supabase.rpc("has_platform_owner");
+    const loadCanClaimPlatformOwner = async () => {
+      const { data, error } = await supabase.rpc("can_claim_platform_owner");
       if (error) {
         toast.error(error.message);
-        setHasPlatformOwner(false);
+        setCanClaimPlatformOwner(false);
         return;
       }
 
-      setHasPlatformOwner(Boolean(data));
+      setCanClaimPlatformOwner(Boolean(data));
     };
 
-    void loadHasPlatformOwner();
+    void loadCanClaimPlatformOwner();
   }, []);
 
   const pinMismatch = newPin.length < 4 || newPin !== confirmPin;
@@ -104,7 +104,6 @@ const SettingsPage = () => {
       return;
     }
 
-    setHasPlatformOwner(true);
     await logAudit("Claimed platform owner access", `Platform owner access claimed by ${user?.email || "unknown user"}.`);
     toast.success("Platform owner access claimed. The separate Platform Accounts page is now unlocked.");
   };
@@ -120,7 +119,7 @@ const SettingsPage = () => {
         </div>
 
         <div className="grid gap-6 xl:grid-cols-2">
-          {!isPlatformOwner && hasPlatformOwner === false && (
+          {!isPlatformOwner && canClaimPlatformOwner === true && (
             <Card className="border-primary/20 xl:col-span-2">
               <CardHeader>
                 <CardTitle className="flex items-center gap-2">
@@ -145,7 +144,7 @@ const SettingsPage = () => {
             </Card>
           )}
 
-          {!isPlatformOwner && hasPlatformOwner === true && (
+          {!isPlatformOwner && canClaimPlatformOwner === false && (
             <Card className="border-primary/20 xl:col-span-2">
               <CardHeader>
                 <CardTitle className="flex items-center gap-2">
