@@ -28,6 +28,7 @@ const ProtectedRoute = ({
     loading,
     role,
     isPlatformOwner,
+    isPlatformOwnerReady,
     hasOwnerSecurityPin,
     isSensitiveAccessVerified,
     getSensitiveAccessExpiresAt,
@@ -54,6 +55,14 @@ const ProtectedRoute = ({
 
   if (allowedRoles && (!role || !allowedRoles.includes(role as Enums<"app_role">))) {
     return <Navigate to={redirectTo} replace />;
+  }
+
+  if (requirePlatformOwner && !isPlatformOwnerReady) {
+    return (
+      <div className="flex min-h-screen items-center justify-center bg-background">
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary" />
+      </div>
+    );
   }
 
   if (requirePlatformOwner && !isPlatformOwner) {

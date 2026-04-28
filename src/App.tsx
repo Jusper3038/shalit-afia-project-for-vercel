@@ -49,7 +49,7 @@ const App = () => (
               <Route path="/billing" element={<ProtectedRoute><BillingPage /></ProtectedRoute>} />
               <Route path="/payments" element={<ProtectedRoute allowedRoles={["admin"]} requireSensitiveVerification><PaymentsPage /></ProtectedRoute>} />
               <Route path="/audit-logs" element={<ProtectedRoute allowedRoles={["admin"]} requireSensitiveVerification><AuditLogsPage /></ProtectedRoute>} />
-              <Route path="/users" element={<ProtectedRoute><UsersPage /></ProtectedRoute>} />
+              <Route path="/users" element={<ProtectedRoute requirePlatformOwner><UsersPage /></ProtectedRoute>} />
               <Route path="/settings" element={<ProtectedRoute allowedRoles={["admin"]} requireSensitiveVerification><SettingsPage /></ProtectedRoute>} />
               <Route path="*" element={<NotFound />} />
             </Routes>

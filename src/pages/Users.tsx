@@ -28,10 +28,7 @@ type SystemUser = {
 type LeadRow = Tables<"leads">;
 
 const UsersPage = () => {
-  const { claimPlatformOwnerAccess, user } = useAuth();
-  const [creatorUnlocked, setCreatorUnlocked] = useState(
-    () => sessionStorage.getItem("creator_view_unlocked") === "true"
-  );
+  const { isPlatformOwner, claimPlatformOwnerAccess, loading, user } = useAuth();
   const [users, setUsers] = useState<SystemUser[]>([]);
   const [leads, setLeads] = useState<LeadRow[]>([]);
   const [searchTerm, setSearchTerm] = useState("");
@@ -72,7 +69,7 @@ const UsersPage = () => {
   };
 
   useEffect(() => {
-    if (!creatorUnlocked) {
+    if (!isPlatformOwner) {
       setUsers([]);
       setLeads([]);
       return;
@@ -80,22 +77,7 @@ const UsersPage = () => {
 
     void fetchUsers();
     void fetchLeads();
-  }, [creatorUnlocked]);
-
-  const handleOpenCreatorView = async () => {
-    setClaimingAccess(true);
-    const { error } = await claimPlatformOwnerAccess();
-    setClaimingAccess(false);
-
-    if (error) {
-      toast.error(error);
-      return;
-    }
-
-    sessionStorage.setItem("creator_view_unlocked", "true");
-    setCreatorUnlocked(true);
-    toast.success("Creator view unlocked.");
-  };
+  }, [isPlatformOwner]);
 
   const handleDelete = async (account: SystemUser) => {
     const confirmed = window.confirm(
@@ -159,6 +141,51 @@ const UsersPage = () => {
     );
   });
 
+  if (loading) {
+    return (
+      <AppLayout>
+        <div className="flex min-h-[50vh] items-center justify-center">
+          <div className="h-8 w-8 animate-spin rounded-full border-2 border-primary/25 border-t-primary" />
+        </div>
+      </AppLayout>
+    );
+  }
+
+  if (!isPlatformOwner) {
+    return (
+      <AppLayout>
+        <div className="space-y-6">
+          <div>
+            <h2 className="text-2xl font-bold">Platform Accounts</h2>
+            <p className="text-sm text-muted-foreground">
+              This page is reserved for the first account that claimed creator access.
+            </p>
+          </div>
+
+          <Card className="border-primary/20">
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <ShieldCheck className="h-5 w-5" />
+                Creator Access
+              </CardTitle>
+              <CardDescription>
+                Current account: {user?.email || "Unknown user"}
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <p className="text-sm text-muted-foreground">
+                Claim creator access from Settings on the first account, then this page will appear only for that account.
+              </p>
+              <Button type="button" onClick={() => void claimPlatformOwnerAccess()} disabled={claimingAccess}>
+                {claimingAccess ? "Opening..." : "Retry Creator Access"}
+              </Button>
+            </CardContent>
+          </Card>
+        </div>
+      </AppLayout>
+    );
+  }
+
   return (
     <AppLayout>
       <div className="space-y-6">
@@ -169,191 +196,165 @@ const UsersPage = () => {
               Creator-only view of every clinic account using this system.
             </p>
           </div>
-
           <Input
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
             placeholder="Search by name, email, clinic, or role"
             className="w-full lg:w-[320px]"
-            disabled={!creatorUnlocked}
           />
         </div>
 
-        {!creatorUnlocked ? (
-          <Card className="border-primary/20">
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <ShieldCheck className="h-5 w-5" />
-                Creator Access
-              </CardTitle>
-              <CardDescription>
-                Open the creator view to load platform accounts and homepage leads.
-              </CardDescription>
+        <div className="grid gap-4 sm:grid-cols-3">
+          <Card>
+            <CardHeader className="pb-2">
+              <CardTitle className="text-sm font-medium">Total Users</CardTitle>
             </CardHeader>
-            <CardContent className="space-y-4">
-              <p className="text-sm text-muted-foreground">
-                Current account: <span className="font-medium text-foreground">{user?.email || "Unknown user"}</span>
-              </p>
-              <Button type="button" onClick={handleOpenCreatorView} disabled={claimingAccess}>
-                {claimingAccess ? "Opening..." : "Open Creator View"}
-              </Button>
+            <CardContent className="flex items-center justify-between">
+              <span className="text-2xl font-bold">{users.length}</span>
+              <UsersIcon className="h-5 w-5 text-muted-foreground" />
             </CardContent>
           </Card>
-        ) : (
-          <>
-            <div className="grid gap-4 sm:grid-cols-3">
-              <Card>
-                <CardHeader className="pb-2">
-                  <CardTitle className="text-sm font-medium">Total Users</CardTitle>
-                </CardHeader>
-                <CardContent className="flex items-center justify-between">
-                  <span className="text-2xl font-bold">{users.length}</span>
-                  <UsersIcon className="h-5 w-5 text-muted-foreground" />
-                </CardContent>
-              </Card>
-              <Card>
-                <CardHeader className="pb-2">
-                  <CardTitle className="text-sm font-medium">Active Accounts</CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <span className="text-2xl font-bold">{users.filter((account) => account.is_active).length}</span>
-                </CardContent>
-              </Card>
-              <Card>
-                <CardHeader className="pb-2">
-                  <CardTitle className="text-sm font-medium">Deactivated</CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <span className="text-2xl font-bold">{users.filter((account) => !account.is_active).length}</span>
-                </CardContent>
-              </Card>
-            </div>
+          <Card>
+            <CardHeader className="pb-2">
+              <CardTitle className="text-sm font-medium">Active Accounts</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <span className="text-2xl font-bold">{users.filter((account) => account.is_active).length}</span>
+            </CardContent>
+          </Card>
+          <Card>
+            <CardHeader className="pb-2">
+              <CardTitle className="text-sm font-medium">Deactivated</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <span className="text-2xl font-bold">{users.filter((account) => !account.is_active).length}</span>
+            </CardContent>
+          </Card>
+        </div>
 
-            <Card className="border-primary/20">
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <Inbox className="h-5 w-5" />
-                  Lead Inbox
-                </CardTitle>
-                <CardDescription>
-                  Homepage leads are visible here only for the creator of the system, not for clinic owners.
-                </CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                {loadingLeads ? (
-                  <div className="text-sm text-muted-foreground">Loading leads...</div>
-                ) : leads.length === 0 ? (
-                  <div className="rounded-xl border bg-muted/40 p-4 text-sm text-muted-foreground">
-                    No leads yet. Once someone submits the popup on the homepage, their details will appear here.
-                  </div>
-                ) : (
-                  <div className="space-y-3">
-                    {leads.map((lead) => (
-                      <div key={lead.id} className="rounded-2xl border bg-background p-4 shadow-sm">
-                        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-                          <div className="space-y-1">
-                            <div className="flex flex-wrap items-center gap-2">
-                              <p className="font-semibold text-foreground">{lead.full_name}</p>
-                              <span className="rounded-full bg-primary/10 px-2 py-0.5 text-xs font-medium text-primary">
-                                {lead.status}
-                              </span>
-                            </div>
-                            <div className="flex flex-wrap items-center gap-3 text-sm text-muted-foreground">
-                              <span className="inline-flex items-center gap-1">
-                                <Mail className="h-4 w-4" />
-                                {lead.email}
-                              </span>
-                              <span>{lead.clinic_name}</span>
-                            </div>
-                          </div>
-                          <div className="text-sm text-muted-foreground">
-                            {new Date(lead.created_at).toLocaleString([], {
-                              dateStyle: "medium",
-                              timeStyle: "short",
-                            })}
-                          </div>
+        <Card className="border-primary/20">
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <Inbox className="h-5 w-5" />
+              Lead Inbox
+            </CardTitle>
+            <CardDescription>
+              Homepage leads are visible here only for the creator of the system, not for clinic owners.
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            {loadingLeads ? (
+              <div className="text-sm text-muted-foreground">Loading leads...</div>
+            ) : leads.length === 0 ? (
+              <div className="rounded-xl border bg-muted/40 p-4 text-sm text-muted-foreground">
+                No leads yet. Once someone submits the popup on the homepage, their details will appear here.
+              </div>
+            ) : (
+              <div className="space-y-3">
+                {leads.map((lead) => (
+                  <div key={lead.id} className="rounded-2xl border bg-background p-4 shadow-sm">
+                    <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                      <div className="space-y-1">
+                        <div className="flex flex-wrap items-center gap-2">
+                          <p className="font-semibold text-foreground">{lead.full_name}</p>
+                          <span className="rounded-full bg-primary/10 px-2 py-0.5 text-xs font-medium text-primary">
+                            {lead.status}
+                          </span>
+                        </div>
+                        <div className="flex flex-wrap items-center gap-3 text-sm text-muted-foreground">
+                          <span className="inline-flex items-center gap-1">
+                            <Mail className="h-4 w-4" />
+                            {lead.email}
+                          </span>
+                          <span>{lead.clinic_name}</span>
                         </div>
                       </div>
-                    ))}
+                      <div className="text-sm text-muted-foreground">
+                        {new Date(lead.created_at).toLocaleString([], {
+                          dateStyle: "medium",
+                          timeStyle: "short",
+                        })}
+                      </div>
+                    </div>
                   </div>
-                )}
-              </CardContent>
-            </Card>
+                ))}
+              </div>
+            )}
+          </CardContent>
+        </Card>
 
-            <Card>
-              <CardHeader>
-                <CardTitle>User Directory</CardTitle>
-              </CardHeader>
-              <CardContent className="p-0">
-                {loadingUsers ? (
-                  <div className="flex h-32 items-center justify-center">
-                    <div className="h-6 w-6 animate-spin rounded-full border-b-2 border-primary" />
-                  </div>
-                ) : filteredUsers.length === 0 ? (
-                  <div className="p-6 text-center text-muted-foreground">No users found for this search.</div>
-                ) : (
-                  <Table>
-                    <TableHeader>
-                      <TableRow>
-                        <TableHead>Name</TableHead>
-                        <TableHead>Email</TableHead>
-                        <TableHead>Clinic</TableHead>
-                        <TableHead>Role</TableHead>
-                        <TableHead>Status</TableHead>
-                        <TableHead>Joined</TableHead>
-                        <TableHead className="text-right">Actions</TableHead>
-                      </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                      {filteredUsers.map((account) => (
-                        <TableRow key={account.user_id}>
-                          <TableCell className="font-medium">{account.name || "-"}</TableCell>
-                          <TableCell>{account.email || "-"}</TableCell>
-                          <TableCell>{account.clinic_name || "-"}</TableCell>
-                          <TableCell>
-                            <Badge variant={account.role === "admin" ? "default" : "secondary"}>{account.role}</Badge>
-                          </TableCell>
-                          <TableCell>
-                            <Badge variant={account.is_active ? "default" : "destructive"}>
-                              {account.is_active ? "Active" : "Deactivated"}
-                            </Badge>
-                          </TableCell>
-                          <TableCell>{new Date(account.created_at).toLocaleDateString()}</TableCell>
-                          <TableCell className="text-right">
-                            <div className="flex justify-end gap-2">
-                              <Button
-                                type="button"
-                                variant="outline"
-                                size="sm"
-                                onClick={() => handleToggleStatus(account)}
-                                disabled={updatingStatusUserId === account.user_id}
-                              >
-                                <Power className="mr-2 h-4 w-4" />
-                                {updatingStatusUserId === account.user_id
-                                  ? "Saving..."
-                                  : account.is_active ? "Deactivate" : "Reactivate"}
-                              </Button>
-                              <Button
-                                type="button"
-                                variant="destructive"
-                                size="sm"
-                                onClick={() => handleDelete(account)}
-                                disabled={deletingUserId === account.user_id}
-                              >
-                                <Trash2 className="mr-2 h-4 w-4" />
-                                {deletingUserId === account.user_id ? "Deleting..." : "Delete"}
-                              </Button>
-                            </div>
-                          </TableCell>
-                        </TableRow>
-                      ))}
-                    </TableBody>
-                  </Table>
-                )}
-              </CardContent>
-            </Card>
-          </>
-        )}
+        <Card>
+          <CardHeader>
+            <CardTitle>User Directory</CardTitle>
+          </CardHeader>
+          <CardContent className="p-0">
+            {loadingUsers ? (
+              <div className="flex h-32 items-center justify-center">
+                <div className="h-6 w-6 animate-spin rounded-full border-b-2 border-primary" />
+              </div>
+            ) : filteredUsers.length === 0 ? (
+              <div className="p-6 text-center text-muted-foreground">No users found for this search.</div>
+            ) : (
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Name</TableHead>
+                    <TableHead>Email</TableHead>
+                    <TableHead>Clinic</TableHead>
+                    <TableHead>Role</TableHead>
+                    <TableHead>Status</TableHead>
+                    <TableHead>Joined</TableHead>
+                    <TableHead className="text-right">Actions</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {filteredUsers.map((account) => (
+                    <TableRow key={account.user_id}>
+                      <TableCell className="font-medium">{account.name || "-"}</TableCell>
+                      <TableCell>{account.email || "-"}</TableCell>
+                      <TableCell>{account.clinic_name || "-"}</TableCell>
+                      <TableCell>
+                        <Badge variant={account.role === "admin" ? "default" : "secondary"}>{account.role}</Badge>
+                      </TableCell>
+                      <TableCell>
+                        <Badge variant={account.is_active ? "default" : "destructive"}>
+                          {account.is_active ? "Active" : "Deactivated"}
+                        </Badge>
+                      </TableCell>
+                      <TableCell>{new Date(account.created_at).toLocaleDateString()}</TableCell>
+                      <TableCell className="text-right">
+                        <div className="flex justify-end gap-2">
+                          <Button
+                            type="button"
+                            variant="outline"
+                            size="sm"
+                            onClick={() => handleToggleStatus(account)}
+                            disabled={updatingStatusUserId === account.user_id}
+                          >
+                            <Power className="mr-2 h-4 w-4" />
+                            {updatingStatusUserId === account.user_id
+                              ? "Saving..."
+                              : account.is_active ? "Deactivate" : "Reactivate"}
+                          </Button>
+                          <Button
+                            type="button"
+                            variant="destructive"
+                            size="sm"
+                            onClick={() => handleDelete(account)}
+                            disabled={deletingUserId === account.user_id}
+                          >
+                            <Trash2 className="mr-2 h-4 w-4" />
+                            {deletingUserId === account.user_id ? "Deleting..." : "Delete"}
+                          </Button>
+                        </div>
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            )}
+          </CardContent>
+        </Card>
       </div>
     </AppLayout>
   );
