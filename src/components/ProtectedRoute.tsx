@@ -13,6 +13,7 @@ type ProtectedRouteProps = {
   allowedRoles?: Enums<"app_role">[];
   redirectTo?: string;
   requireSensitiveVerification?: boolean;
+  requirePlatformOwner?: boolean;
 };
 
 const ProtectedRoute = ({
@@ -20,11 +21,13 @@ const ProtectedRoute = ({
   allowedRoles,
   redirectTo = "/billing",
   requireSensitiveVerification = false,
+  requirePlatformOwner = false,
 }: ProtectedRouteProps) => {
   const {
     session,
     loading,
     role,
+    isPlatformOwner,
     hasOwnerSecurityPin,
     isSensitiveAccessVerified,
     getSensitiveAccessExpiresAt,
@@ -50,6 +53,10 @@ const ProtectedRoute = ({
   }
 
   if (allowedRoles && (!role || !allowedRoles.includes(role as Enums<"app_role">))) {
+    return <Navigate to={redirectTo} replace />;
+  }
+
+  if (requirePlatformOwner && !isPlatformOwner) {
     return <Navigate to={redirectTo} replace />;
   }
 

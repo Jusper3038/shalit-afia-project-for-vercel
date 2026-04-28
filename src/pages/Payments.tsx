@@ -12,6 +12,8 @@ import { toast } from "sonner";
 import { Phone, RefreshCw } from "lucide-react";
 import type { Tables } from "@/integrations/supabase/types";
 
+const getErrorMessage = (error: unknown) => error instanceof Error ? error.message : "Failed to initiate M-Pesa payment";
+
 const PaymentsPage = () => {
   const { user } = useAuth();
   const [payments, setPayments] = useState<Tables<"payments">[]>([]);
@@ -59,8 +61,8 @@ const PaymentsPage = () => {
       } else {
         toast.error(data?.errorMessage || data?.ResponseDescription || "M-Pesa request failed");
       }
-    } catch (err: any) {
-      toast.error(err.message || "Failed to initiate M-Pesa payment");
+    } catch (error) {
+      toast.error(getErrorMessage(error));
     } finally {
       setSubmitting(false);
     }

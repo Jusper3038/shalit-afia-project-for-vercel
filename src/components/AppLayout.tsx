@@ -13,13 +13,12 @@ import {
   Receipt,
   ScrollText,
   CreditCard,
-  Users,
+  Settings,
   LogOut,
   Menu,
   X,
   Heart,
   Sparkles,
-  ShieldCheck,
 } from "lucide-react";
 
 const ClinicAssistant = lazy(() => import("@/components/ClinicAssistant"));
@@ -30,20 +29,19 @@ const navItems = [
   { to: "/patients", label: "Patients", icon: Users, ownerOnly: false },
   { to: "/billing", label: "Billing", icon: Receipt, ownerOnly: false },
   { to: "/payments", label: "Payments", icon: CreditCard, ownerOnly: true },
-  { to: "/users", label: "Users", icon: Users, ownerOnly: true },
+  { to: "/users", label: "Platform Accounts", icon: Users, ownerOnly: false, platformOnly: true },
   { to: "/audit-logs", label: "Audit Logs", icon: ScrollText, ownerOnly: true },
+  { to: "/settings", label: "Settings", icon: Settings, ownerOnly: true },
 ];
 
 const AppLayout = ({ children }: { children: React.ReactNode }) => {
-  const { profile, role, signOut, setOwnerSecurityPin, hasOwnerSecurityPin } = useAuth();
+  const { profile, role, isPlatformOwner, signOut } = useAuth();
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [ownerGreeting, setOwnerGreeting] = useState<string | null>(null);
-  const [pinDialogOpen, setPinDialogOpen] = useState(false);
-  const [currentPin, setCurrentPin] = useState("");
-  const [pin, setPin] = useState("");
-  const [confirmPin, setConfirmPin] = useState("");
-  const [savingPin, setSavingPin] = useState(false);
-  const visibleNavItems = navItems.filter((item) => !item.ownerOnly || role === "admin");
+  const visibleNavItems = navItems.filter((item) => {
+    if (item.platformOnly) return isPlatformOwner;
+    return !item.ownerOnly || role === "admin";
+  });
 
   useEffect(() => {
     const shouldShowGreeting = sessionStorage.getItem("show_owner_greeting") === "true";
@@ -68,26 +66,6 @@ const AppLayout = ({ children }: { children: React.ReactNode }) => {
 
     return () => window.clearTimeout(timeoutId);
   }, [ownerGreeting]);
-
-  const pinMismatch = pin.length < 4 || pin !== confirmPin;
-
-  const handleSavePin = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setSavingPin(true);
-    const { error } = await setOwnerSecurityPin(pin, hasOwnerSecurityPin ? currentPin : undefined);
-    setSavingPin(false);
-
-    if (error) {
-      toast.error(error);
-      return;
-    }
-
-    toast.success(hasOwnerSecurityPin ? "Security PIN updated." : "Security PIN created.");
-    setCurrentPin("");
-    setPin("");
-    setConfirmPin("");
-    setPinDialogOpen(false);
-  };
 
   return (
     <div className="flex min-h-screen bg-background">
@@ -142,12 +120,6 @@ const AppLayout = ({ children }: { children: React.ReactNode }) => {
           <h1 className="text-lg font-semibold">
             {profile?.clinic_name || "SHALIT AFIA"}
           </h1>
-          {role === "admin" && (
-            <Button variant="outline" size="sm" className="gap-2" onClick={() => setPinDialogOpen(true)}>
-              <ShieldCheck className="h-4 w-4" />
-              {hasOwnerSecurityPin ? "Change Security PIN" : "Set Security PIN"}
-            </Button>
-          )}
           <div className="ml-auto text-sm text-muted-foreground">
             {profile?.name || "User"}
           </div>
@@ -177,64 +149,6 @@ const AppLayout = ({ children }: { children: React.ReactNode }) => {
           {children}
         </main>
       </div>
-      <Dialog open={pinDialogOpen} onOpenChange={setPinDialogOpen}>
-        <DialogContent className="sm:max-w-md">
-          <DialogHeader>
-            <DialogTitle>{hasOwnerSecurityPin ? "Change Owner Security PIN" : "Create Owner Security PIN"}</DialogTitle>
-            <DialogDescription>
-              Use a separate 4 to 6 digit PIN for sensitive owner-only areas like Dashboard, Inventory, Payments, and Audit Logs.
-            </DialogDescription>
-          </DialogHeader>
-          <form onSubmit={handleSavePin} className="space-y-4">
-            {hasOwnerSecurityPin && (
-              <div className="space-y-2">
-                <Label htmlFor="current-owner-pin">Current Security PIN</Label>
-                <Input
-                  id="current-owner-pin"
-                  type="password"
-                  inputMode="numeric"
-                  maxLength={6}
-                  value={currentPin}
-                  onChange={(e) => setCurrentPin(e.target.value.replace(/\D/g, "").slice(0, 6))}
-                  placeholder="Enter current Security PIN"
-                  required
-                />
-              </div>
-            )}
-            <div className="space-y-2">
-              <Label htmlFor="new-owner-pin">Security PIN</Label>
-              <Input
-                id="new-owner-pin"
-                type="password"
-                inputMode="numeric"
-                maxLength={6}
-                value={pin}
-                onChange={(e) => setPin(e.target.value.replace(/\D/g, "").slice(0, 6))}
-                placeholder="Enter 4 to 6 digits"
-                required
-              />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="confirm-owner-pin">Confirm Security PIN</Label>
-              <Input
-                id="confirm-owner-pin"
-                type="password"
-                inputMode="numeric"
-                maxLength={6}
-                value={confirmPin}
-                onChange={(e) => setConfirmPin(e.target.value.replace(/\D/g, "").slice(0, 6))}
-                placeholder="Re-enter Security PIN"
-                required
-              />
-            </div>
-            <DialogFooter>
-              <Button type="submit" disabled={savingPin || pinMismatch || (hasOwnerSecurityPin && currentPin.length < 4)}>
-                {savingPin ? "Saving..." : hasOwnerSecurityPin ? "Update PIN" : "Create PIN"}
-              </Button>
-            </DialogFooter>
-          </form>
-        </DialogContent>
-      </Dialog>
       <Suspense fallback={null}>
         <ClinicAssistant />
       </Suspense>

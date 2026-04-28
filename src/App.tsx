@@ -17,6 +17,7 @@ const BillingPage = lazy(() => import("./pages/Billing"));
 const PaymentsPage = lazy(() => import("./pages/Payments"));
 const AuditLogsPage = lazy(() => import("./pages/AuditLogs"));
 const UsersPage = lazy(() => import("./pages/Users"));
+const SettingsPage = lazy(() => import("./pages/Settings"));
 const NotFound = lazy(() => import("./pages/NotFound"));
 
 const queryClient = new QueryClient();
@@ -43,12 +44,13 @@ const App = () => (
               <Route path="/login" element={<Login />} />
               <Route path="/register" element={<Register />} />
               <Route path="/dashboard" element={<ProtectedRoute allowedRoles={["admin"]} requireSensitiveVerification><Dashboard /></ProtectedRoute>} />
-              <Route path="/drugs" element={<ProtectedRoute allowedRoles={["admin"]} requireSensitiveVerification><DrugsPage /></ProtectedRoute>} />
+              <Route path="/drugs" element={<ProtectedRoute allowedRoles={["admin"]}><DrugsPage /></ProtectedRoute>} />
               <Route path="/patients" element={<ProtectedRoute><PatientsPage /></ProtectedRoute>} />
               <Route path="/billing" element={<ProtectedRoute><BillingPage /></ProtectedRoute>} />
               <Route path="/payments" element={<ProtectedRoute allowedRoles={["admin"]} requireSensitiveVerification><PaymentsPage /></ProtectedRoute>} />
               <Route path="/audit-logs" element={<ProtectedRoute allowedRoles={["admin"]} requireSensitiveVerification><AuditLogsPage /></ProtectedRoute>} />
-              <Route path="/users" element={<ProtectedRoute allowedRoles={["admin"]} requireSensitiveVerification><UsersPage /></ProtectedRoute>} />
+              <Route path="/users" element={<ProtectedRoute requirePlatformOwner requireSensitiveVerification redirectTo="/dashboard"><UsersPage /></ProtectedRoute>} />
+              <Route path="/settings" element={<ProtectedRoute allowedRoles={["admin"]} requireSensitiveVerification><SettingsPage /></ProtectedRoute>} />
               <Route path="*" element={<NotFound />} />
             </Routes>
           </Suspense>

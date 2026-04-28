@@ -24,6 +24,7 @@ type TransactionPeriodFields = {
   sale_week_start?: string | null;
   sale_year?: number | null;
   total_cost: number;
+  unit_selling_price?: number | null;
 };
 
 type CsvLookup = {
@@ -203,9 +204,7 @@ export const buildSalesCsvRows = (
       Item: drug?.name || "Item",
       Batch: drug?.serial_number || "-",
       Quantity: transaction.quantity,
-      "Unit Selling Price": Number(
-        "unit_selling_price" in transaction ? (transaction as TransactionPeriodFields & { unit_selling_price?: number | null }).unit_selling_price ?? 0 : 0,
-      ),
+      "Unit Selling Price": Number(transaction.unit_selling_price ?? 0),
       "Total Cost": Number(transaction.total_cost),
     };
   });

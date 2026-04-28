@@ -1,4 +1,6 @@
-export const exportToCSV = (data: Record<string, any>[], filename: string) => {
+type CsvValue = string | number | boolean | null | undefined;
+
+export const exportToCSV = (data: Record<string, CsvValue>[], filename: string) => {
   if (data.length === 0) return;
   const headers = Object.keys(data[0]);
   const csv = [

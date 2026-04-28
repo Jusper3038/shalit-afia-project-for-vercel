@@ -11,8 +11,10 @@ interface AuthContextType {
   user: User | null;
   profile: Tables<"profiles"> | null;
   role: string | null;
+  isPlatformOwner: boolean;
   loading: boolean;
   hasOwnerSecurityPin: boolean;
+  claimPlatformOwnerAccess: () => Promise<{ error?: string }>;
   isSensitiveAccessVerified: () => boolean;
   getSensitiveAccessExpiresAt: () => number | null;
   verifySensitiveAccess: (pin: string) => Promise<{ error?: string }>;
@@ -26,8 +28,10 @@ const AuthContext = createContext<AuthContextType>({
   user: null,
   profile: null,
   role: null,
+  isPlatformOwner: false,
   loading: true,
   hasOwnerSecurityPin: false,
+  claimPlatformOwnerAccess: async () => ({ error: "Not implemented" }),
   isSensitiveAccessVerified: () => false,
   getSensitiveAccessExpiresAt: () => null,
   verifySensitiveAccess: async () => ({ error: "Not implemented" }),
@@ -43,6 +47,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const [user, setUser] = useState<User | null>(null);
   const [profile, setProfile] = useState<Tables<"profiles"> | null>(null);
   const [role, setRole] = useState<string | null>(null);
+  const [isPlatformOwner, setIsPlatformOwner] = useState(false);
   const [hasOwnerSecurityPin, setHasOwnerSecurityPin] = useState(false);
   const [loading, setLoading] = useState(true);
 
@@ -52,6 +57,19 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       .select("*")
       .eq("user_id", userId)
       .single();
+
+    if (data && !data.is_active) {
+      sessionStorage.setItem("auth_blocked_message", "This account has been deactivated. Contact the system owner.");
+      await supabase.auth.signOut();
+      setSession(null);
+      setUser(null);
+      setProfile(null);
+      setRole(null);
+      setIsPlatformOwner(false);
+      setHasOwnerSecurityPin(false);
+      return;
+    }
+
     setProfile(data);
   };
 
@@ -71,6 +89,16 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     }
   };
 
+  const fetchPlatformOwnerStatus = async (userId: string) => {
+    const { data, error } = await supabase.rpc("is_platform_owner", {
+      _user_id: userId,
+    });
+
+    if (!error) {
+      setIsPlatformOwner(Boolean(data));
+    }
+  };
+
   useEffect(() => {
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       async (_event, session) => {
@@ -80,11 +108,13 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
           setTimeout(() => {
             fetchProfile(session.user.id);
             fetchRole(session.user.id);
+            fetchPlatformOwnerStatus(session.user.id);
             fetchOwnerSecurityPinStatus();
           }, 0);
         } else {
           setProfile(null);
           setRole(null);
+          setIsPlatformOwner(false);
           setHasOwnerSecurityPin(false);
         }
         setLoading(false);
@@ -97,6 +127,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       if (session?.user) {
         fetchProfile(session.user.id);
         fetchRole(session.user.id);
+        fetchPlatformOwnerStatus(session.user.id);
         fetchOwnerSecurityPinStatus();
       }
       setLoading(false);
@@ -180,7 +211,19 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     setUser(null);
     setProfile(null);
     setRole(null);
+    setIsPlatformOwner(false);
     setHasOwnerSecurityPin(false);
+  };
+
+  const claimPlatformOwnerAccess = async () => {
+    const { data, error } = await supabase.rpc("claim_platform_owner_access");
+
+    if (error) {
+      return { error: error.message };
+    }
+
+    setIsPlatformOwner(Boolean(data));
+    return {};
   };
 
   return (
@@ -190,8 +233,10 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         user,
         profile,
         role,
+        isPlatformOwner,
         loading,
         hasOwnerSecurityPin,
+        claimPlatformOwnerAccess,
         isSensitiveAccessVerified,
         getSensitiveAccessExpiresAt,
         verifySensitiveAccess,
