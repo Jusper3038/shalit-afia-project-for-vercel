@@ -35,11 +35,11 @@ const navItems = [
 ];
 
 const AppLayout = ({ children }: { children: React.ReactNode }) => {
-  const { profile, role, isPlatformOwner, isPlatformOwnerReady, signOut } = useAuth();
+  const { profile, role, isPlatformOwner, signOut } = useAuth();
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [ownerGreeting, setOwnerGreeting] = useState<string | null>(null);
   const visibleNavItems = navItems.filter((item) => {
-    if (item.platformOnly) return isPlatformOwnerReady && isPlatformOwner;
+    if (item.platformOnly) return true;
     return !item.ownerOnly || role === "admin";
   });
 

@@ -162,11 +162,21 @@ const UsersPage = () => {
   if (!isPlatformOwnerReady) {
     return (
       <AppLayout>
-        <div className="flex min-h-[60vh] items-center justify-center">
-          <div className="flex items-center gap-3 rounded-full border bg-card px-5 py-3 shadow-sm">
-            <div className="h-5 w-5 animate-spin rounded-full border-2 border-primary/25 border-t-primary" />
-            <span className="text-sm text-muted-foreground">Opening Platform Accounts...</span>
+        <div className="space-y-6">
+          <div>
+            <h2 className="text-2xl font-bold">Platform Accounts</h2>
+            <p className="text-sm text-muted-foreground">
+              Checking creator access...
+            </p>
           </div>
+          <Card className="border-primary/20">
+            <CardContent className="flex min-h-[40vh] items-center justify-center p-6">
+              <div className="flex items-center gap-3 rounded-full border bg-card px-5 py-3 shadow-sm">
+                <div className="h-5 w-5 animate-spin rounded-full border-2 border-primary/25 border-t-primary" />
+                <span className="text-sm text-muted-foreground">Opening Platform Accounts...</span>
+              </div>
+            </CardContent>
+          </Card>
         </div>
       </AppLayout>
     );
