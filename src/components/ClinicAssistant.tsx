@@ -11,6 +11,9 @@ import type { Tables } from "@/integrations/supabase/types";
 import { getClinicDayKey, getClinicWeekStartKey, getMonthLabel, getTransactionSaleDay, getTransactionSaleMonth, getTransactionSaleYear } from "@/lib/reporting";
 import { getDaysUntilExpiry, isExpiredDrug, isExpiringSoonDrug } from "@/lib/inventory";
 
+const OLLAMA_BASE_URL = import.meta.env.VITE_OLLAMA_BASE_URL || "http://localhost:11434";
+const OLLAMA_MODEL = import.meta.env.VITE_OLLAMA_MODEL || "llama3.1:8b";
+
 type Message = {
   id: string;
   role: "assistant" | "user";
@@ -37,12 +40,13 @@ const ClinicAssistant = () => {
   const { user, profile } = useAuth();
   const [open, setOpen] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [sending, setSending] = useState(false);
   const [input, setInput] = useState("");
   const [messages, setMessages] = useState<Message[]>([
     {
       id: "welcome",
       role: "assistant",
-      text: "I can summarize daily operations, highlight stock risks, and suggest revenue improvements. Ask for today's report, best-selling items, profit, payments, or growth ideas.",
+      text: "I can summarize daily operations, highlight stock risks, and suggest revenue improvements. Ask for today's report, best-selling items, profit, payments, or growth ideas. When Ollama is available, I’ll use a smarter local model for richer answers.",
     },
   ]);
   const [data, setData] = useState<AssistantData>({
@@ -144,6 +148,79 @@ const ClinicAssistant = () => {
       currentMonthLabel: `${getMonthLabel(currentMonth)} ${currentYear}`,
     };
   }, [data]);
+
+  const buildClinicSnapshot = () =>
+    [
+      `Clinic: ${profile?.clinic_name || "your clinic"}`,
+      `Today sales: ${formatCurrency(analytics.todaySales)}`,
+      `Today profit: ${formatCurrency(analytics.todayProfit)}`,
+      `This week sales: ${formatCurrency(analytics.weekSales)}`,
+      `This month sales: ${formatCurrency(analytics.monthSales)}`,
+      `Completed payments today: ${formatCurrency(analytics.todayPayments)}`,
+      `Total patients: ${analytics.totalPatients}`,
+      `Low stock items: ${analytics.lowStockItems.length}`,
+      `Out of stock items: ${analytics.outOfStockItems.length}`,
+      `Expiring soon items: ${analytics.expiringItems.length}`,
+      `Expired items: ${analytics.expiredItems.length}`,
+      analytics.topSellingItems.length > 0
+        ? `Top seller this month: ${analytics.topSellingItems[0][0]}`
+        : "Top seller this month: none yet",
+    ].join("\n");
+
+  const buildSystemPrompt = () =>
+    [
+      "You are a helpful clinic operations assistant for Shalit Afia.",
+      "Your job is to help the owner understand sales, stock, patients, payments, profit, and growth opportunities.",
+      "Be concise, practical, and friendly.",
+      "Use the clinic snapshot and recent conversation for context.",
+      "If a user asks for analysis, give actionable advice, not generic AI filler.",
+      "If the data does not support a claim, say so plainly.",
+      "Prefer short paragraphs or bullets.",
+    ].join(" ");
+
+  const callOllama = async (prompt: string, history: Message[]) => {
+    const recentMessages = history
+      .slice(-6)
+      .map((message) => ({
+        role: message.role,
+        content: message.text,
+      }));
+
+    const response = await fetch(`${OLLAMA_BASE_URL}/api/chat`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        model: OLLAMA_MODEL,
+        stream: false,
+        messages: [
+          {
+            role: "system",
+            content: `${buildSystemPrompt()}\n\nClinic snapshot:\n${buildClinicSnapshot()}`,
+          },
+          ...recentMessages,
+          {
+            role: "user",
+            content: prompt,
+          },
+        ],
+      }),
+    });
+
+    if (!response.ok) {
+      throw new Error(`Ollama request failed with status ${response.status}`);
+    }
+
+    const data = (await response.json()) as { message?: { content?: string } };
+    const content = data.message?.content?.trim();
+
+    if (!content) {
+      throw new Error("Ollama returned an empty response.");
+    }
+
+    return content;
+  };
 
   const buildTodayReport = () => {
     return [
@@ -279,11 +356,33 @@ const ClinicAssistant = () => {
     const assistantMessage: Message = {
       id: `assistant-${Date.now() + 1}`,
       role: "assistant",
-      text: answerPrompt(trimmed),
+      text: "Thinking with Ollama...",
     };
 
     setMessages((current) => [...current, userMessage, assistantMessage]);
     setInput("");
+
+    const runAssistant = async () => {
+      setSending(true);
+      try {
+        const reply = await callOllama(trimmed, [...messages, userMessage]);
+        setMessages((current) =>
+          current.map((message) =>
+            message.id === assistantMessage.id ? { ...message, text: reply } : message,
+          ),
+        );
+      } catch {
+        setMessages((current) =>
+          current.map((message) =>
+            message.id === assistantMessage.id ? { ...message, text: answerPrompt(trimmed) } : message,
+          ),
+        );
+      } finally {
+        setSending(false);
+      }
+    };
+
+    void runAssistant();
   };
 
   const handleSubmit = (e: FormEvent) => {
@@ -324,6 +423,7 @@ const ClinicAssistant = () => {
             <TrendingUp className="h-3.5 w-3.5" />
             Revenue Assistant
           </Badge>
+          <Badge variant="outline">{OLLAMA_MODEL}</Badge>
         </div>
 
         <div className="mt-4 flex flex-wrap gap-2">
@@ -365,10 +465,10 @@ const ClinicAssistant = () => {
             value={input}
             onChange={(e) => setInput(e.target.value)}
             placeholder="Ask about sales, stock, profit, or revenue ideas..."
-            disabled={loading}
+            disabled={loading || sending}
           />
-          <Button type="submit" disabled={loading || !input.trim()}>
-            <Send className="h-4 w-4" />
+          <Button type="submit" disabled={loading || sending || !input.trim()}>
+            {sending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
           </Button>
         </form>
       </SheetContent>
