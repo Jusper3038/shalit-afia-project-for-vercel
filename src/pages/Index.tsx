@@ -109,6 +109,12 @@ const dashboardSamples = [
   },
 ];
 
+const clinicianPhoto = {
+  src: "https://images.pexels.com/photos/19963186/pexels-photo-19963186.jpeg?cs=srgb&dl=pexels-tessy-agbonome-521343232-19963186.jpg&fm=jpg",
+  alt: "Smiling clinician in a white coat on a bright white background",
+  caption: "The people behind the dashboard still matter most.",
+};
+
 const Index = () => {
   const { session, loading, role } = useAuth();
   const [leadOpen, setLeadOpen] = useState(false);
@@ -477,6 +483,15 @@ const Index = () => {
         <section id="platform" className="py-14">
           <div className="mx-auto grid max-w-7xl gap-12 px-4 sm:px-6 lg:grid-cols-[0.92fr_1.08fr] lg:px-8">
             <div className="overflow-hidden rounded-[28px] border border-sky-100 bg-white shadow-[0_30px_80px_rgba(59,130,246,0.08)]">
+              <div className="border-b border-sky-100">
+                <img
+                  src={clinicianPhoto.src}
+                  alt={clinicianPhoto.alt}
+                  className="h-60 w-full object-cover"
+                  loading="lazy"
+                  decoding="async"
+                />
+              </div>
               <div className="border-b border-sky-100 px-6 py-5">
                 <p className="text-sm font-semibold uppercase tracking-[0.24em] text-primary">Platform</p>
                 <h3 className="mt-3 max-w-lg text-2xl font-semibold leading-tight sm:text-3xl">
@@ -485,6 +500,7 @@ const Index = () => {
                 <p className="mt-3 max-w-lg text-sm leading-6 text-muted-foreground">
                   A white canvas, blue accents, and one steady system behind the scenes.
                 </p>
+                <p className="mt-3 text-sm font-semibold text-primary">{clinicianPhoto.caption}</p>
               </div>
 
               <div className="grid gap-4 p-6 sm:grid-cols-2">
