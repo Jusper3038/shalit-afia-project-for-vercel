@@ -29,7 +29,7 @@ type SystemUser = {
 type LeadRow = Tables<"leads">;
 
 const UsersPage = () => {
-  const { isPlatformOwner, claimPlatformOwnerAccess, user } = useAuth();
+  const { isPlatformOwner, isPlatformOwnerReady, claimPlatformOwnerAccess, user } = useAuth();
   const [users, setUsers] = useState<SystemUser[]>([]);
   const [loading, setLoading] = useState(true);
   const [deletingUserId, setDeletingUserId] = useState<string | null>(null);
@@ -71,14 +71,14 @@ const UsersPage = () => {
   };
 
   useEffect(() => {
-    if (isPlatformOwner) {
+    if (isPlatformOwnerReady && isPlatformOwner) {
       fetchUsers();
       fetchLeads();
     } else {
       setUsers([]);
       setLeads([]);
     }
-  }, [isPlatformOwner]);
+  }, [isPlatformOwner, isPlatformOwnerReady]);
 
   const handleDelete = async (user: SystemUser) => {
     const confirmed = window.confirm(
@@ -158,6 +158,19 @@ const UsersPage = () => {
       user.role,
     ].some((value) => value?.toLowerCase().includes(needle));
   });
+
+  if (!isPlatformOwnerReady) {
+    return (
+      <AppLayout>
+        <div className="flex min-h-[60vh] items-center justify-center">
+          <div className="flex items-center gap-3 rounded-full border bg-card px-5 py-3 shadow-sm">
+            <div className="h-5 w-5 animate-spin rounded-full border-2 border-primary/25 border-t-primary" />
+            <span className="text-sm text-muted-foreground">Opening Platform Accounts...</span>
+          </div>
+        </div>
+      </AppLayout>
+    );
+  }
 
   if (!isPlatformOwner) {
     return (

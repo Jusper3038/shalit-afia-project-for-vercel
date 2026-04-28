@@ -12,6 +12,7 @@ interface AuthContextType {
   profile: Tables<"profiles"> | null;
   role: string | null;
   isPlatformOwner: boolean;
+  isPlatformOwnerReady: boolean;
   loading: boolean;
   hasOwnerSecurityPin: boolean;
   claimPlatformOwnerAccess: () => Promise<{ error?: string }>;
@@ -29,6 +30,7 @@ const AuthContext = createContext<AuthContextType>({
   profile: null,
   role: null,
   isPlatformOwner: false,
+  isPlatformOwnerReady: false,
   loading: true,
   hasOwnerSecurityPin: false,
   claimPlatformOwnerAccess: async () => ({ error: "Not implemented" }),
@@ -48,6 +50,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const [profile, setProfile] = useState<Tables<"profiles"> | null>(null);
   const [role, setRole] = useState<string | null>(null);
   const [isPlatformOwner, setIsPlatformOwner] = useState(false);
+  const [isPlatformOwnerReady, setIsPlatformOwnerReady] = useState(false);
   const [hasOwnerSecurityPin, setHasOwnerSecurityPin] = useState(false);
   const [loading, setLoading] = useState(true);
 
@@ -66,6 +69,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       setProfile(null);
       setRole(null);
       setIsPlatformOwner(false);
+      setIsPlatformOwnerReady(false);
       setHasOwnerSecurityPin(false);
       return;
     }
@@ -90,6 +94,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   };
 
   const fetchPlatformOwnerStatus = async (userId: string) => {
+    setIsPlatformOwnerReady(false);
     const { data, error } = await supabase.rpc("is_platform_owner", {
       _user_id: userId,
     });
@@ -97,6 +102,8 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     if (!error) {
       setIsPlatformOwner(Boolean(data));
     }
+
+    setIsPlatformOwnerReady(true);
   };
 
   useEffect(() => {
@@ -115,6 +122,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
           setProfile(null);
           setRole(null);
           setIsPlatformOwner(false);
+          setIsPlatformOwnerReady(false);
           setHasOwnerSecurityPin(false);
         }
         setLoading(false);
@@ -129,6 +137,8 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         fetchRole(session.user.id);
         fetchPlatformOwnerStatus(session.user.id);
         fetchOwnerSecurityPinStatus();
+      } else {
+        setIsPlatformOwnerReady(false);
       }
       setLoading(false);
     });
@@ -212,6 +222,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     setProfile(null);
     setRole(null);
     setIsPlatformOwner(false);
+    setIsPlatformOwnerReady(false);
     setHasOwnerSecurityPin(false);
   };
 
@@ -234,6 +245,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         profile,
         role,
         isPlatformOwner,
+        isPlatformOwnerReady,
         loading,
         hasOwnerSecurityPin,
         claimPlatformOwnerAccess,
