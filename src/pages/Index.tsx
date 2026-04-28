@@ -47,16 +47,16 @@ const capabilities = [
 
 const glowPoints = [
   {
-    label: "Warm smiles",
-    detail: "Clinicians who feel approachable, kind, and ready to help",
+    label: "Calm check-in",
+    detail: "The front desk sees the right record at the right moment",
   },
   {
-    label: "Bright rooms",
-    detail: "Open spaces that make the whole experience feel lighter",
+    label: "Clear handoff",
+    detail: "Nurses, doctors, and billing work from one shared view",
   },
   {
-    label: "Shared focus",
-    detail: "A team moving together with less friction and more trust",
+    label: "Clean follow-through",
+    detail: "Payments, reports, and inventory keep the story moving",
   },
 ];
 
@@ -64,22 +64,22 @@ const heroImages = [
   {
     src: "https://images.pexels.com/photos/4989168/pexels-photo-4989168.jpeg?cs=srgb&dl=pexels-ivan-s-4989168.jpg&fm=jpg",
     alt: "Smiling doctor leaning forward in a bright modern workspace",
-    caption: "A doctor who looks glad to be in the room",
+    caption: "The dashboard opens with a doctor who already knows the day is under control",
   },
   {
     src: "https://images.pexels.com/photos/8376333/pexels-photo-8376333.jpeg?cs=srgb&dl=pexels-tima-miroshnichenko-8376333.jpg&fm=jpg",
     alt: "Smiling clinician in a white coat speaking warmly at a desk",
-    caption: "Warm, human, and easy to trust",
+    caption: "A patient record that feels easy to trust because it stays easy to read",
   },
   {
     src: "https://images.pexels.com/photos/7578806/pexels-photo-7578806.jpeg?cs=srgb&dl=pexels-cottonbro-7578806.jpg&fm=jpg",
     alt: "Smiling doctor in conversation with a patient in a bright clinic",
-    caption: "The kind of care that brightens a day",
+    caption: "One conversation, one visit, one clear path through the visit flow",
   },
   {
     src: "https://images.pexels.com/photos/34833855/pexels-photo-34833855.jpeg?cs=srgb&dl=pexels-safana-2151149986-34833855.jpg&fm=jpg",
     alt: "Two joyful clinicians in matching uniforms and pink hijabs",
-    caption: "A team that feels proud to work together",
+    caption: "The shared clinic view that keeps the whole team moving in sync",
   },
 ];
 
@@ -200,7 +200,7 @@ const Index = () => {
                   />
                   <div className="p-4">
                     <p className="text-sm font-semibold text-foreground">{heroImages[0].caption}</p>
-                    <p className="mt-1 text-sm text-muted-foreground">A first impression that feels generous, not rushed.</p>
+                    <p className="mt-1 text-sm text-muted-foreground">That first glance says the system is already on top of the day.</p>
                   </div>
                 </div>
 
@@ -215,18 +215,18 @@ const Index = () => {
                     />
                     <div className="p-4">
                       <p className="text-sm font-semibold text-foreground">{heroImages[1].caption}</p>
-                      <p className="mt-1 text-sm text-muted-foreground">Helpful, calm, and easy to approach.</p>
+                      <p className="mt-1 text-sm text-muted-foreground">A clear patient profile makes the next step feel obvious.</p>
                     </div>
                   </div>
 
                   <div className="rounded-[28px] border border-primary/10 bg-primary/95 p-5 text-primary-foreground shadow-[0_24px_70px_rgba(14,165,233,0.2)]">
                     <div className="flex items-center gap-2 text-sm font-semibold uppercase tracking-[0.22em] text-white/70">
                       <HeartHandshake className="h-4 w-4" />
-                      Mood boost
+                      Workflow lift
                     </div>
                     <p className="mt-3 text-2xl font-semibold leading-tight">A happier team feels different the moment you open the app.</p>
                     <p className="mt-2 text-sm leading-6 text-white/80">
-                      More light, less friction, and a dashboard that looks like the clinic is thriving instead of merely surviving.
+                      More light, less friction, and a dashboard that makes the clinic feel alive, coordinated, and in control.
                     </p>
                   </div>
                 </div>
@@ -242,7 +242,7 @@ const Index = () => {
                     />
                     <div className="p-4">
                       <p className="text-sm font-semibold text-foreground">{heroImages[3].caption}</p>
-                      <p className="mt-1 text-sm text-muted-foreground">Team chemistry you can feel through the screen.</p>
+                      <p className="mt-1 text-sm text-muted-foreground">The same case, the same context, the same direction.</p>
                     </div>
                   </div>
 
@@ -256,7 +256,7 @@ const Index = () => {
                     />
                     <div className="p-4">
                       <p className="text-sm font-semibold text-foreground">{heroImages[2].caption}</p>
-                      <p className="mt-1 text-sm text-muted-foreground">The room feels kinder before the conversation even starts.</p>
+                      <p className="mt-1 text-sm text-muted-foreground">The visit flow keeps everyone calm from check-in to billing.</p>
                     </div>
                   </div>
                 </div>
@@ -270,10 +270,11 @@ const Index = () => {
             <div className="max-w-2xl">
               <p className="text-sm font-semibold uppercase tracking-[0.24em] text-primary">Gallery</p>
               <h2 className="mt-3 text-3xl font-semibold tracking-tight text-foreground sm:text-4xl">
-                The page should feel like a good day at the clinic, not a spreadsheet.
+                The images should show the software making real clinic moments easier.
               </h2>
               <p className="mt-4 text-base leading-7 text-muted-foreground">
-                The visuals lean into warmth, energy, and people smiling because they are genuinely helping each other.
+                Each picture now points back to a product moment: a calmer check-in, a clearer patient view, a smoother
+                handoff, and a billing flow that closes the loop.
               </p>
             </div>
 
@@ -293,12 +294,14 @@ const Index = () => {
                     />
                     <div className="absolute inset-0 bg-[linear-gradient(180deg,rgba(255,255,255,0)_40%,rgba(3,7,18,0.32)_100%)]" />
                     <div className="absolute left-4 top-4 rounded-full border border-white/60 bg-white/85 px-3 py-1 text-xs font-semibold text-primary shadow-sm">
-                      {index === 0 ? "Bright morning" : index === 1 ? "Warm welcome" : index === 2 ? "Patient calm" : "Team joy"}
+                      {index === 0 ? "Dashboard ready" : index === 1 ? "Record clarity" : index === 2 ? "Visit flow" : "Shared view"}
                     </div>
                   </div>
                   <div className="p-4">
                     <p className="text-sm font-semibold text-foreground">{image.caption}</p>
-                    <p className="mt-1 text-sm text-muted-foreground">A visual cue that this clinic knows how to feel good to use.</p>
+                    <p className="mt-1 text-sm text-muted-foreground">
+                      A visual cue that the software is quietly making the day easier behind the smile.
+                    </p>
                   </div>
                 </div>
               ))}
@@ -362,11 +365,11 @@ const Index = () => {
             <div className="flex flex-col justify-center">
               <p className="text-sm font-semibold uppercase tracking-[0.24em] text-primary">What changes</p>
               <h2 className="mt-3 text-3xl font-semibold tracking-tight text-foreground sm:text-4xl">
-                Less friction. More presence. More room to smile.
+                Less friction. More presence. More room for the software to do the heavy lifting.
               </h2>
               <p className="mt-4 text-base leading-7 text-muted-foreground">
                 Shalit Afia is built for the clinic that wants to feel modern without feeling cold. It keeps the essentials
-                visible, the workflow simple, and the emotional tone brighter.
+                visible, the workflow simple, and the emotional tone brighter while the system carries the admin load.
               </p>
 
               <div className="mt-8 grid gap-4 sm:grid-cols-2">
@@ -442,10 +445,10 @@ const Index = () => {
                 <div>
                   <p className="text-sm font-semibold uppercase tracking-[0.24em] text-white/75">Ready when you are</p>
                   <h2 className="mt-3 text-3xl font-semibold tracking-tight sm:text-4xl">
-                    Give your clinic a homepage that feels like a smile, not a form field.
+                    Give your clinic a homepage that feels like a living part of the workflow, not a dead-end form.
                   </h2>
                   <p className="mt-4 max-w-2xl text-base leading-7 text-white/80">
-                    Start with the story, then step into the app when you’re ready. The page should feel inviting long before
+                    Start with the story, then step into the app when you're ready. The page should feel inviting long before
                     it asks for a password.
                   </p>
                 </div>
