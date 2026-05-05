@@ -22,7 +22,7 @@ const AuditLogsPage = () => {
       <div className="space-y-4">
         <h2 className="text-2xl font-bold">Audit Logs</h2>
         <Card>
-          <CardContent className="overflow-hidden p-0">
+          <CardContent className="overflow-x-auto p-0">
             {loading ? (
               <div className="flex items-center justify-center h-32"><div className="animate-spin rounded-full h-6 w-6 border-b-2 border-primary" /></div>
             ) : logs.length === 0 ? (

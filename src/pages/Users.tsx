@@ -287,7 +287,7 @@ const UsersPage = () => {
           <CardHeader>
             <CardTitle>User Directory</CardTitle>
           </CardHeader>
-          <CardContent className="overflow-hidden p-0">
+          <CardContent className="overflow-x-auto p-0">
             {loadingUsers ? (
               <div className="flex h-32 items-center justify-center">
                 <div className="h-6 w-6 animate-spin rounded-full border-b-2 border-primary" />

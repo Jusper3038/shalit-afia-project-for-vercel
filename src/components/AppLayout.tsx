@@ -120,7 +120,7 @@ const AppLayout = ({ children }: { children: React.ReactNode }) => {
       </aside>
 
       {/* Main content */}
-      <div className="flex flex-1 flex-col">
+      <div className="flex min-w-0 flex-1 flex-col">
         <header className="flex min-h-16 items-center gap-2 border-b bg-card px-3 py-3 sm:gap-4 sm:px-4 lg:px-6">
           <Button variant="ghost" size="icon" className="lg:hidden" onClick={() => setSidebarOpen(true)}>
             <Menu className="h-5 w-5" />
@@ -132,7 +132,7 @@ const AppLayout = ({ children }: { children: React.ReactNode }) => {
             {profile?.name || "User"}
           </div>
         </header>
-        <main className="flex-1 p-3 sm:p-4 lg:p-6">
+        <main className="min-w-0 flex-1 p-3 sm:p-4 lg:p-6">
           {ownerGreeting && (
             <div className="mb-6 rounded-2xl border bg-gradient-to-r from-primary/15 via-background to-amber-500/15 p-4 shadow-sm sm:p-5">
               <div className="flex flex-col gap-4 sm:flex-row sm:items-start">

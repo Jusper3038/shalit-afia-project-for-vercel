@@ -198,11 +198,11 @@ const Dashboard = () => {
 
   return (
     <AppLayout>
-      <div className="space-y-6">
-        <div className="animate-in fade-in-50 slide-in-from-top-2 duration-500 rounded-2xl border bg-gradient-to-br from-primary/10 via-background to-amber-500/10 p-6 shadow-sm">
+      <div className="space-y-4 sm:space-y-6">
+        <div className="animate-in fade-in-50 slide-in-from-top-2 duration-500 rounded-lg border bg-gradient-to-br from-primary/10 via-background to-amber-500/10 p-4 shadow-sm sm:p-6">
           <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
-            <div>
-              <h2 className="text-3xl font-bold tracking-tight">Dashboard</h2>
+            <div className="min-w-0">
+              <h2 className="text-2xl font-bold tracking-tight sm:text-3xl">Dashboard</h2>
               <p className="mt-1 text-sm text-muted-foreground">
                 Quick view of sales, stock health, and profit trends for {rangeLabel.toLowerCase()}.
               </p>
@@ -212,7 +212,7 @@ const Dashboard = () => {
                 <span className="text-muted-foreground">Current Time: {formatClinicTime(now)}</span>
               </div>
             </div>
-            <div className="flex flex-wrap gap-2">
+            <div className="grid grid-cols-2 gap-2 sm:flex sm:flex-wrap">
               {([
                 { label: "Daily", value: "daily" },
                 { label: "Weekly", value: "weekly" },
@@ -225,7 +225,7 @@ const Dashboard = () => {
                   type="button"
                   size="sm"
                   variant={salesPeriod === option.value ? "default" : "outline"}
-                  className="flex-1 transition-transform duration-200 hover:-translate-y-0.5 sm:flex-none"
+                  className="min-w-0 flex-1 transition-transform duration-200 hover:-translate-y-0.5 sm:flex-none"
                   onClick={() => setSalesPeriod(option.value)}
                 >
                   {option.label}
@@ -281,7 +281,7 @@ const Dashboard = () => {
                 type="button"
                 size="sm"
                 variant="outline"
-                className="w-full sm:w-auto"
+                className="col-span-2 w-full sm:w-auto"
                 disabled={csvRows.length === 0 || customRangeInvalid}
                 onClick={() => exportToCSV(
                   csvRows,
@@ -365,7 +365,7 @@ const Dashboard = () => {
         </div>
 
         <div className="grid gap-4 lg:grid-cols-[1.15fr_0.85fr]">
-          <Card className="animate-in fade-in-50 slide-in-from-bottom-2 duration-500">
+          <Card className="min-w-0 animate-in fade-in-50 slide-in-from-bottom-2 duration-500">
             <CardHeader>
               <CardTitle>Sales Trend</CardTitle>
             </CardHeader>
@@ -381,13 +381,13 @@ const Dashboard = () => {
               ) : (
                 <ChartContainer
                   config={trendChartConfig}
-                  className="h-[320px] w-full"
+                  className="h-[240px] w-full sm:h-[320px]"
                 >
                   {salesPeriod === "yearly" ? (
                     <BarChart data={trendData}>
                       <CartesianGrid vertical={false} />
                       <XAxis dataKey="label" tickLine={false} axisLine={false} />
-                      <YAxis tickLine={false} axisLine={false} width={80} />
+                      <YAxis tickLine={false} axisLine={false} width={48} />
                       <ChartTooltip content={<ChartTooltipContent />} />
                       <Bar dataKey="sales" radius={[8, 8, 0, 0]} fill="var(--color-sales)" />
                     </BarChart>
@@ -395,7 +395,7 @@ const Dashboard = () => {
                     <LineChart data={trendData}>
                       <CartesianGrid vertical={false} />
                       <XAxis dataKey="label" tickLine={false} axisLine={false} />
-                      <YAxis tickLine={false} axisLine={false} width={80} />
+                      <YAxis tickLine={false} axisLine={false} width={48} />
                       <ChartTooltip content={<ChartTooltipContent />} />
                       <Line type="monotone" dataKey="sales" stroke="var(--color-sales)" strokeWidth={3} dot={{ fill: "var(--color-sales)" }} activeDot={{ r: 6 }} />
                     </LineChart>

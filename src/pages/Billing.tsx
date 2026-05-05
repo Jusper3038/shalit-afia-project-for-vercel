@@ -528,7 +528,7 @@ const BillingPage = () => {
 
   return (
     <AppLayout>
-      <div className="space-y-6">
+      <div className="space-y-4 sm:space-y-6">
         <h2 className="text-2xl font-bold">Billing</h2>
 
         <Card>
@@ -552,7 +552,7 @@ const BillingPage = () => {
                 </Select>
               </div>
 
-              <div className="rounded-lg border p-4">
+              <div className="rounded-lg border p-3 sm:p-4">
                 <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_120px_140px_160px] lg:items-end">
                   <div>
                     <Label>Item</Label>
@@ -563,11 +563,13 @@ const BillingPage = () => {
                           variant="outline"
                           role="combobox"
                           aria-expanded={drugPickerOpen}
-                          className="w-full justify-between font-normal"
+                          className="w-full min-w-0 justify-between font-normal"
                         >
-                          {selectedItemSummary
-                            ? `${selectedItemSummary.itemName} (Stock: ${getRemainingStock(selectedItemSummary.itemName)})`
-                            : "Search and select item"}
+                          <span className="min-w-0 truncate text-left">
+                            {selectedItemSummary
+                              ? `${selectedItemSummary.itemName} (Stock: ${getRemainingStock(selectedItemSummary.itemName)})`
+                              : "Search and select item"}
+                          </span>
                           <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
                         </Button>
                       </PopoverTrigger>
@@ -589,9 +591,9 @@ const BillingPage = () => {
                                     }}
                                   >
                                     <Check className={cn("mr-2 h-4 w-4", selectedDrug === item.itemName ? "opacity-100" : "opacity-0")} />
-                                    <div className="flex flex-1 items-center justify-between gap-3">
-                                      <span>{item.itemName}</span>
-                                      <span className="text-xs text-muted-foreground">
+                                    <div className="flex min-w-0 flex-1 flex-col gap-1 sm:flex-row sm:items-center sm:justify-between sm:gap-3">
+                                      <span className="truncate">{item.itemName}</span>
+                                      <span className="text-xs text-muted-foreground sm:text-right">
                                         Stock: {getRemainingStock(item.itemName)}
                                         {item.serials.length > 0 ? ` | ${item.serials.length} batch(es)` : ""}
                                         {item.nextExpiry ? ` | Next: ${getExpiryLabel(item.batches[0])}` : ""}
@@ -683,8 +685,8 @@ const BillingPage = () => {
                       const maxAllowedDiscountPercentage = getMaxDiscountPercentageForItem(item.itemName, item.quantity);
 
                       return (
-                        <div key={item.itemName} className="grid gap-3 rounded-lg border p-4 lg:grid-cols-[minmax(0,1fr)_110px_120px_140px_48px] lg:items-center">
-                          <div>
+                        <div key={item.itemName} className="grid gap-3 rounded-lg border p-3 sm:p-4 lg:grid-cols-[minmax(0,1fr)_110px_120px_140px_48px] lg:items-center">
+                          <div className="min-w-0">
                             <p className="font-medium">{item.itemName}</p>
                             <p className="text-sm text-muted-foreground">
                               {pricing.allocations.map((allocation) => `${allocation.drug.serial_number || "Batch"} x${allocation.quantity}`).join(" | ")}
@@ -789,7 +791,7 @@ const BillingPage = () => {
           </Button>
         </div>
         <Card>
-          <CardContent className="overflow-hidden p-0">
+          <CardContent className="overflow-x-auto p-0">
             {loading ? (
               <div className="flex items-center justify-center h-32"><div className="animate-spin rounded-full h-6 w-6 border-b-2 border-primary" /></div>
             ) : groupedTransactions.length === 0 ? (
