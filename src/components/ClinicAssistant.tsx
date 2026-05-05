@@ -1,12 +1,12 @@
-import { FormEvent, useEffect, useMemo, useState } from "react";
+import { FormEvent, useEffect, useMemo, useRef, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
 import { Badge } from "@/components/ui/badge";
-import { Bot, Loader2, Send, Sparkles, TrendingUp } from "lucide-react";
+import { AlertTriangle, Bot, Loader2, PackageCheck, Send, Sparkles, TrendingUp } from "lucide-react";
 import type { Tables } from "@/integrations/supabase/types";
 import { getClinicDayKey, getClinicWeekStartKey, getMonthLabel, getTransactionSaleDay, getTransactionSaleMonth, getTransactionSaleYear } from "@/lib/reporting";
 import { getDaysUntilExpiry, isExpiredDrug, isExpiringSoonDrug } from "@/lib/inventory";
@@ -54,6 +54,7 @@ const ClinicAssistant = () => {
     payments: [],
     transactions: [],
   });
+  const messagesEndRef = useRef<HTMLDivElement | null>(null);
 
   useEffect(() => {
     if (!open || !user) return;
@@ -86,6 +87,11 @@ const ClinicAssistant = () => {
       cancelled = true;
     };
   }, [open, user]);
+
+  useEffect(() => {
+    if (!open) return;
+    messagesEndRef.current?.scrollIntoView({ behavior: "smooth", block: "end" });
+  }, [messages, loading, open]);
 
   const analytics = useMemo(() => {
     const now = new Date();
@@ -336,20 +342,15 @@ const ClinicAssistant = () => {
   const handlePrompt = (prompt: string) => {
     const trimmed = prompt.trim();
     if (!trimmed) return;
-    const nextMessages = [
-      ...messages,
-      {
-        id: `user-${Date.now()}`,
-        role: "user" as const,
-        text: trimmed,
-      },
-    ];
-
     const userMessage: Message = {
       id: `user-${Date.now()}`,
       role: "user",
       text: trimmed,
     };
+    const nextMessages = [
+      ...messages,
+      userMessage,
+    ];
 
     const assistantMessage: Message = {
       id: `assistant-${Date.now() + 1}`,
@@ -394,49 +395,89 @@ const ClinicAssistant = () => {
         <Button
           type="button"
           size="icon"
-          className="fixed bottom-6 right-6 z-40 h-14 w-14 rounded-full shadow-lg"
+          className="fixed bottom-5 right-5 z-40 h-14 w-14 rounded-full border border-white/25 bg-primary shadow-xl shadow-primary/25 transition-transform hover:-translate-y-1 hover:shadow-2xl sm:bottom-6 sm:right-6"
+          aria-label="Open clinic assistant"
         >
           <Bot className="h-6 w-6" />
+          <span className="absolute -right-0.5 -top-0.5 h-4 w-4 rounded-full border-2 border-background bg-emerald-500" />
         </Button>
       </SheetTrigger>
-      <SheetContent side="right" className="flex w-full flex-col sm:max-w-xl">
-        <SheetHeader>
-          <div className="flex items-center gap-3">
-            <div className="rounded-2xl bg-primary/15 p-3 text-primary">
-              <Sparkles className="h-5 w-5" />
+      <SheetContent side="right" className="flex w-full max-w-full flex-col gap-0 overflow-hidden p-0 sm:max-w-xl">
+        <div className="border-b bg-card px-4 py-4 sm:px-5">
+          <SheetHeader className="text-left">
+            <div className="flex items-start gap-3 pr-8">
+              <div className="rounded-lg bg-primary p-2.5 text-primary-foreground shadow-sm">
+                <Sparkles className="h-5 w-5" />
+              </div>
+              <div className="min-w-0">
+                <div className="flex flex-wrap items-center gap-2">
+                  <SheetTitle className="text-base sm:text-lg">Clinic Assistant</SheetTitle>
+                  <Badge className="h-6 rounded-md bg-emerald-500/15 px-2 text-emerald-700 hover:bg-emerald-500/15">
+                    Live
+                  </Badge>
+                </div>
+                <SheetDescription className="mt-1">
+                  Sales, stock, profit, payments, and growth answers from your clinic data.
+                </SheetDescription>
+              </div>
             </div>
-            <div>
-              <SheetTitle>Clinic Assistant</SheetTitle>
-              <SheetDescription>
-                Live operational insights for sales, stock, profit, and growth opportunities.
-              </SheetDescription>
+          </SheetHeader>
+
+          <div className="mt-4 grid grid-cols-3 gap-2">
+            <div className="rounded-lg border bg-background px-3 py-2">
+              <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
+                <TrendingUp className="h-3.5 w-3.5 text-primary" />
+                Today
+              </div>
+              <p className="mt-1 truncate text-sm font-semibold">{formatCurrency(analytics.todaySales)}</p>
+            </div>
+            <div className="rounded-lg border bg-background px-3 py-2">
+              <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
+                <PackageCheck className="h-3.5 w-3.5 text-emerald-600" />
+                Stock
+              </div>
+              <p className="mt-1 truncate text-sm font-semibold">{data.drugs.length} items</p>
+            </div>
+            <div className="rounded-lg border bg-background px-3 py-2">
+              <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
+                <AlertTriangle className="h-3.5 w-3.5 text-amber-600" />
+                Alerts
+              </div>
+              <p className="mt-1 truncate text-sm font-semibold">
+                {analytics.lowStockItems.length + analytics.outOfStockItems.length + analytics.expiringItems.length}
+              </p>
             </div>
           </div>
-        </SheetHeader>
 
-        <div className="mt-4 flex flex-wrap gap-2">
-          <Badge variant="outline">{profile?.clinic_name || "Clinic"}</Badge>
-          <Badge variant="outline">{analytics.currentMonthLabel}</Badge>
-          <Badge variant="outline" className="gap-1">
-            <TrendingUp className="h-3.5 w-3.5" />
-            Revenue Assistant
-          </Badge>
-          <Badge variant="outline">{OLLAMA_MODEL}</Badge>
+          <div className="mt-3 flex flex-wrap gap-2">
+            <Badge variant="outline" className="rounded-md">{profile?.clinic_name || "Clinic"}</Badge>
+            <Badge variant="outline" className="rounded-md">{analytics.currentMonthLabel}</Badge>
+            <Badge variant="outline" className="rounded-md">{OLLAMA_MODEL}</Badge>
+          </div>
         </div>
 
-        <div className="mt-4 flex flex-wrap gap-2">
+        <div className="border-b bg-background px-4 py-3 sm:px-5">
+          <div className="flex gap-2 overflow-x-auto pb-1">
           {quickPrompts.map((prompt) => (
-            <Button key={prompt} type="button" variant="outline" size="sm" onClick={() => handlePrompt(prompt)}>
+            <Button
+              key={prompt}
+              type="button"
+              variant="outline"
+              size="sm"
+              className="shrink-0 rounded-full bg-card text-xs"
+              onClick={() => handlePrompt(prompt)}
+            >
               {prompt}
             </Button>
           ))}
+          </div>
         </div>
 
-        <div className="mt-4 min-h-0 flex-1 rounded-2xl border bg-muted/20">
-          <ScrollArea className="h-full p-4">
-            <div className="space-y-3">
+        <div className="min-h-0 flex-1 bg-muted/25">
+          <ScrollArea className="h-full">
+            <div className="space-y-4 px-4 py-5 sm:px-5">
               {loading ? (
-                <div className="flex items-center gap-2 rounded-xl border bg-background px-4 py-3 text-sm text-muted-foreground">
+                <div className="flex items-center gap-2 rounded-lg border bg-background px-4 py-3 text-sm text-muted-foreground shadow-sm">
                   <Loader2 className="h-4 w-4 animate-spin" />
                   Loading clinic data for analysis...
                 </div>
@@ -444,30 +485,56 @@ const ClinicAssistant = () => {
                 messages.map((message) => (
                   <div
                     key={message.id}
-                    className={`max-w-[92%] rounded-2xl px-4 py-3 text-sm leading-6 shadow-sm ${
-                      message.role === "assistant"
-                        ? "border bg-background text-foreground"
-                        : "ml-auto bg-primary text-primary-foreground"
-                    }`}
+                    className={`flex gap-2 ${message.role === "user" ? "justify-end" : "justify-start"}`}
                   >
-                    {message.text}
+                    {message.role === "assistant" && (
+                      <div className="mt-1 flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border bg-card text-primary shadow-sm">
+                        <Bot className="h-4 w-4" />
+                      </div>
+                    )}
+                    <div
+                      className={`max-w-[86%] rounded-lg px-4 py-3 text-sm leading-6 shadow-sm sm:max-w-[82%] ${
+                        message.role === "assistant"
+                          ? "border bg-card text-foreground"
+                          : "bg-primary text-primary-foreground"
+                      }`}
+                    >
+                      <p className="whitespace-pre-line">{message.text}</p>
+                    </div>
                   </div>
                 ))
               )}
+              {sending && !loading && (
+                <div className="flex items-center gap-2 pl-10 text-xs text-muted-foreground">
+                  <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                  Assistant is preparing an answer
+                </div>
+              )}
+              <div ref={messagesEndRef} />
             </div>
           </ScrollArea>
         </div>
 
-        <form onSubmit={handleSubmit} className="mt-4 flex gap-2">
-          <Input
-            value={input}
-            onChange={(e) => setInput(e.target.value)}
-            placeholder="Ask about sales, stock, profit, or revenue ideas..."
-            disabled={loading || sending}
-          />
-          <Button type="submit" disabled={loading || sending || !input.trim()}>
-            {sending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
-          </Button>
+        <form onSubmit={handleSubmit} className="border-t bg-card p-3 sm:p-4">
+          <div className="flex items-end gap-2 rounded-lg border bg-background p-2 shadow-sm">
+            <Textarea
+              value={input}
+              onChange={(e) => setInput(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === "Enter" && !e.shiftKey) {
+                  e.preventDefault();
+                  handlePrompt(input);
+                }
+              }}
+              placeholder="Ask about sales, stock, profit, or revenue ideas..."
+              disabled={loading || sending}
+              className="max-h-28 min-h-10 resize-none border-0 bg-transparent px-2 py-2 shadow-none focus-visible:ring-0 focus-visible:ring-offset-0"
+              rows={1}
+            />
+            <Button type="submit" size="icon" className="h-10 w-10 shrink-0 rounded-lg" disabled={loading || sending || !input.trim()}>
+              {sending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
+            </Button>
+          </div>
         </form>
       </SheetContent>
     </Sheet>
