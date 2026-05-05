@@ -287,7 +287,7 @@ const UsersPage = () => {
           <CardHeader>
             <CardTitle>User Directory</CardTitle>
           </CardHeader>
-          <CardContent className="p-0">
+          <CardContent className="overflow-hidden p-0">
             {loadingUsers ? (
               <div className="flex h-32 items-center justify-center">
                 <div className="h-6 w-6 animate-spin rounded-full border-b-2 border-primary" />
@@ -295,7 +295,7 @@ const UsersPage = () => {
             ) : filteredUsers.length === 0 ? (
               <div className="p-6 text-center text-muted-foreground">No users found for this search.</div>
             ) : (
-              <Table>
+              <Table className="min-w-[980px]">
                 <TableHeader>
                   <TableRow>
                     <TableHead>Name</TableHead>
@@ -323,7 +323,7 @@ const UsersPage = () => {
                       </TableCell>
                       <TableCell>{new Date(account.created_at).toLocaleDateString()}</TableCell>
                       <TableCell className="text-right">
-                        <div className="flex justify-end gap-2">
+                        <div className="flex flex-wrap justify-end gap-2">
                           <Button
                             type="button"
                             variant="outline"

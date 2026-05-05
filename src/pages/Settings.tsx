@@ -7,6 +7,7 @@ import { clampPercent } from "@/lib/discounts";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { PasswordInput } from "@/components/ui/password-input";
 import { Label } from "@/components/ui/label";
 import { toast } from "sonner";
 import { Crown, LockKeyhole, ShieldCheck, Tags } from "lucide-react";
@@ -159,9 +160,8 @@ const SettingsPage = () => {
                 {hasOwnerSecurityPin && (
                   <div className="space-y-2">
                     <Label htmlFor="current-owner-pin">Current Security PIN</Label>
-                    <Input
+                    <PasswordInput
                       id="current-owner-pin"
-                      type="password"
                       inputMode="numeric"
                       maxLength={6}
                       value={currentPin}
@@ -173,9 +173,8 @@ const SettingsPage = () => {
                 )}
                 <div className="space-y-2">
                   <Label htmlFor="new-owner-pin">New Security PIN</Label>
-                  <Input
+                  <PasswordInput
                     id="new-owner-pin"
-                    type="password"
                     inputMode="numeric"
                     maxLength={6}
                     value={newPin}
@@ -186,9 +185,8 @@ const SettingsPage = () => {
                 </div>
                 <div className="space-y-2">
                   <Label htmlFor="confirm-owner-pin">Confirm Security PIN</Label>
-                  <Input
+                  <PasswordInput
                     id="confirm-owner-pin"
-                    type="password"
                     inputMode="numeric"
                     maxLength={6}
                     value={confirmPin}

@@ -18,12 +18,14 @@ import {
   Menu,
   X,
   Heart,
+  Home,
   Sparkles,
 } from "lucide-react";
 
 const ClinicAssistant = lazy(() => import("@/components/ClinicAssistant"));
 
 const navItems = [
+  { to: "/home", label: "Home", icon: Home, ownerOnly: false },
   { to: "/dashboard", label: "Dashboard", icon: LayoutDashboard, ownerOnly: true },
   { to: "/drugs", label: "Inventory", icon: Pill, ownerOnly: true },
   { to: "/patients", label: "Patients", icon: Users, ownerOnly: false },
@@ -68,7 +70,7 @@ const AppLayout = ({ children }: { children: React.ReactNode }) => {
   }, [ownerGreeting]);
 
   return (
-    <div className="flex min-h-screen bg-background">
+    <div className="flex min-h-screen overflow-x-hidden bg-background">
       {/* Mobile overlay */}
       {sidebarOpen && (
         <div className="fixed inset-0 z-40 bg-black/50 lg:hidden" onClick={() => setSidebarOpen(false)} />
@@ -76,18 +78,24 @@ const AppLayout = ({ children }: { children: React.ReactNode }) => {
 
       {/* Sidebar */}
       <aside
-        className={`fixed inset-y-0 left-0 z-50 w-64 transform bg-card border-r transition-transform duration-200 lg:relative lg:translate-x-0 ${
+        className={`fixed inset-y-0 left-0 z-50 flex w-64 transform flex-col border-r bg-card transition-transform duration-200 lg:relative lg:translate-x-0 ${
           sidebarOpen ? "translate-x-0" : "-translate-x-full"
         }`}
       >
         <div className="flex h-16 items-center gap-2 border-b px-4">
           <Heart className="h-6 w-6 text-primary" />
           <span className="text-lg font-bold">SHALIT AFIA</span>
-          <Button variant="ghost" size="icon" className="ml-auto lg:hidden" onClick={() => setSidebarOpen(false)}>
+          <Button variant="ghost" size="icon" className="ml-auto lg:hidden" onClick={() => setSidebarOpen(false)} aria-label="Close menu">
             <X className="h-5 w-5" />
           </Button>
         </div>
-        <nav className="flex flex-col gap-1 p-3">
+        <div className="border-b p-3 lg:hidden">
+          <Button variant="outline" className="w-full justify-center gap-2" onClick={signOut}>
+            <LogOut className="h-4 w-4" />
+            Sign Out
+          </Button>
+        </div>
+        <nav className="flex flex-1 flex-col gap-1 overflow-y-auto p-3">
           {visibleNavItems.map((item) => (
             <Link
               key={item.to}
@@ -100,7 +108,7 @@ const AppLayout = ({ children }: { children: React.ReactNode }) => {
             </Link>
           ))}
         </nav>
-        <div className="absolute bottom-0 left-0 right-0 border-t p-3">
+        <div className="mt-auto hidden border-t p-3 lg:block">
           <div className="mb-2 px-3 text-xs text-muted-foreground truncate">
             {profile?.clinic_name || "My Clinic"}
           </div>
@@ -113,34 +121,34 @@ const AppLayout = ({ children }: { children: React.ReactNode }) => {
 
       {/* Main content */}
       <div className="flex flex-1 flex-col">
-        <header className="flex h-16 items-center gap-4 border-b bg-card px-4 lg:px-6">
+        <header className="flex min-h-16 items-center gap-2 border-b bg-card px-3 py-3 sm:gap-4 sm:px-4 lg:px-6">
           <Button variant="ghost" size="icon" className="lg:hidden" onClick={() => setSidebarOpen(true)}>
             <Menu className="h-5 w-5" />
           </Button>
-          <h1 className="text-lg font-semibold">
+          <h1 className="min-w-0 flex-1 truncate text-base font-semibold sm:text-lg">
             {profile?.clinic_name || "SHALIT AFIA"}
           </h1>
-          <div className="ml-auto text-sm text-muted-foreground">
+          <div className="hidden text-sm text-muted-foreground sm:block">
             {profile?.name || "User"}
           </div>
         </header>
-        <main className="flex-1 p-4 lg:p-6">
+        <main className="flex-1 p-3 sm:p-4 lg:p-6">
           {ownerGreeting && (
-            <div className="mb-6 rounded-2xl border bg-gradient-to-r from-primary/15 via-background to-amber-500/15 p-5 shadow-sm">
-              <div className="flex items-start gap-4">
+            <div className="mb-6 rounded-2xl border bg-gradient-to-r from-primary/15 via-background to-amber-500/15 p-4 shadow-sm sm:p-5">
+              <div className="flex flex-col gap-4 sm:flex-row sm:items-start">
                 <div className="rounded-xl bg-primary/15 p-3 text-primary">
                   <Sparkles className="h-6 w-6" />
                 </div>
                 <div className="flex-1">
                   <p className="text-sm font-semibold uppercase tracking-[0.2em] text-primary">Clinic Owner Greeting</p>
-                  <h2 className="mt-1 text-2xl font-bold tracking-tight lg:text-3xl">
+                  <h2 className="mt-1 text-xl font-bold tracking-tight sm:text-2xl lg:text-3xl">
                     {ownerGreeting}
                   </h2>
                   <p className="mt-2 text-sm text-muted-foreground">
                     You are signed in as the clinic owner and your dashboard is ready.
                   </p>
                 </div>
-                <Button variant="ghost" size="sm" onClick={() => setOwnerGreeting(null)}>
+                <Button variant="ghost" size="sm" className="self-start" onClick={() => setOwnerGreeting(null)}>
                   Dismiss
                 </Button>
               </div>

@@ -22,13 +22,13 @@ const AuditLogsPage = () => {
       <div className="space-y-4">
         <h2 className="text-2xl font-bold">Audit Logs</h2>
         <Card>
-          <CardContent className="p-0">
+          <CardContent className="overflow-hidden p-0">
             {loading ? (
               <div className="flex items-center justify-center h-32"><div className="animate-spin rounded-full h-6 w-6 border-b-2 border-primary" /></div>
             ) : logs.length === 0 ? (
               <div className="p-6 text-center text-muted-foreground">No activity yet.</div>
             ) : (
-              <Table>
+              <Table className="min-w-[760px]">
                 <TableHeader>
                   <TableRow>
                     <TableHead>Timestamp</TableHead>

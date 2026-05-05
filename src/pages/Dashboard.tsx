@@ -225,7 +225,7 @@ const Dashboard = () => {
                   type="button"
                   size="sm"
                   variant={salesPeriod === option.value ? "default" : "outline"}
-                  className="transition-transform duration-200 hover:-translate-y-0.5"
+                  className="flex-1 transition-transform duration-200 hover:-translate-y-0.5 sm:flex-none"
                   onClick={() => setSalesPeriod(option.value)}
                 >
                   {option.label}
@@ -233,7 +233,7 @@ const Dashboard = () => {
               ))}
               {(salesPeriod === "monthly" || salesPeriod === "yearly") && (
                 <Select value={String(selectedYear)} onValueChange={(value) => setSelectedYear(Number(value))}>
-                  <SelectTrigger className="w-[120px]">
+                  <SelectTrigger className="w-full sm:w-[120px]">
                     <SelectValue placeholder="Year" />
                   </SelectTrigger>
                   <SelectContent>
@@ -247,7 +247,7 @@ const Dashboard = () => {
               )}
               {salesPeriod === "monthly" && (
                 <Select value={String(selectedMonth)} onValueChange={(value) => setSelectedMonth(Number(value))}>
-                  <SelectTrigger className="w-[150px]">
+                  <SelectTrigger className="w-full sm:w-[150px]">
                     <SelectValue placeholder="Month" />
                   </SelectTrigger>
                   <SelectContent>
@@ -265,13 +265,13 @@ const Dashboard = () => {
                 <>
                   <Input
                     type="date"
-                    className="w-[160px]"
+                    className="w-full sm:w-[160px]"
                     value={customStartDate}
                     onChange={(e) => setCustomStartDate(e.target.value)}
                   />
                   <Input
                     type="date"
-                    className="w-[160px]"
+                    className="w-full sm:w-[160px]"
                     value={customEndDate}
                     onChange={(e) => setCustomEndDate(e.target.value)}
                   />
@@ -281,6 +281,7 @@ const Dashboard = () => {
                 type="button"
                 size="sm"
                 variant="outline"
+                className="w-full sm:w-auto"
                 disabled={csvRows.length === 0 || customRangeInvalid}
                 onClick={() => exportToCSV(
                   csvRows,
@@ -558,7 +559,7 @@ const Dashboard = () => {
                       type="button"
                       size="sm"
                       variant={alertFilter === option.value ? "default" : "outline"}
-                      className="transition-transform duration-200 hover:-translate-y-0.5"
+                      className="flex-1 transition-transform duration-200 hover:-translate-y-0.5 sm:flex-none"
                       onClick={() => setAlertFilter(option.value)}
                     >
                       {option.label}
@@ -574,7 +575,7 @@ const Dashboard = () => {
                 </div>
               ) : (
                 visibleAlerts.map((drug) => (
-                  <div key={`${alertFilter}-${drug.id}`} className="flex items-center justify-between rounded-md border px-3 py-2 transition-colors hover:bg-accent/40">
+                  <div key={`${alertFilter}-${drug.id}`} className="flex flex-col gap-2 rounded-md border px-3 py-2 transition-colors hover:bg-accent/40 sm:flex-row sm:items-center sm:justify-between">
                     <div>
                       <span className="font-medium">{drug.name}</span>
                       <p className="text-xs text-muted-foreground">
@@ -637,7 +638,7 @@ const Dashboard = () => {
             ) : (
               <div className="space-y-2">
                 {filteredTransactions.slice(-5).reverse().map((t) => (
-                  <div key={t.id} className="flex items-center justify-between rounded-md border px-3 py-2 transition-colors hover:border-primary/40 hover:bg-accent/30">
+                  <div key={t.id} className="flex flex-col gap-2 rounded-md border px-3 py-2 transition-colors hover:border-primary/40 hover:bg-accent/30 sm:flex-row sm:items-center sm:justify-between">
                     <div>
                       <span className="text-sm font-medium">Qty: {t.quantity}</span>
                       <p className="text-xs text-muted-foreground">{rangeLabel}</p>

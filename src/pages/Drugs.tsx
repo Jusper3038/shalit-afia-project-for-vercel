@@ -6,6 +6,7 @@ import { exportToCSV } from "@/lib/csv-export";
 import AppLayout from "@/components/AppLayout";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { PasswordInput } from "@/components/ui/password-input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -200,17 +201,17 @@ const DrugsPage = () => {
   return (
     <AppLayout>
       <div className="space-y-4">
-        <div className="flex items-center justify-between">
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
           <h2 className="text-2xl font-bold">Inventory</h2>
-          <div className="flex gap-2">
-            <Button variant="outline" size="sm" onClick={() => exportToCSV(drugs.map(d => ({ Name: d.name, "Serial Number": d.serial_number ?? "", "Expiry Date": d.expiry_date ?? "", "Date of Purchase": d.date_of_purchase ?? "", "Buying Price": d.buying_price, "Selling Price": d.selling_price, Stock: d.stock_quantity })), "drugs-report")}>
+          <div className="flex flex-wrap gap-2">
+            <Button className="w-full sm:w-auto" variant="outline" size="sm" onClick={() => exportToCSV(drugs.map(d => ({ Name: d.name, "Serial Number": d.serial_number ?? "", "Expiry Date": d.expiry_date ?? "", "Date of Purchase": d.date_of_purchase ?? "", "Buying Price": d.buying_price, "Selling Price": d.selling_price, Stock: d.stock_quantity })), "drugs-report")}>
               <Download className="mr-2 h-4 w-4" />CSV
             </Button>
             <Dialog open={dialogOpen} onOpenChange={(o) => { setDialogOpen(o); if (!o) resetForm(); }}>
               <DialogTrigger asChild>
-                <Button size="sm"><Plus className="mr-2 h-4 w-4" />Add Item</Button>
+                <Button className="w-full sm:w-auto" size="sm"><Plus className="mr-2 h-4 w-4" />Add Item</Button>
               </DialogTrigger>
-              <DialogContent>
+              <DialogContent className="max-h-[85vh] overflow-y-auto">
                 <DialogHeader>
                   <DialogTitle>{editingDrug ? "Edit Drug" : "Add New Drug"}</DialogTitle>
                 </DialogHeader>
@@ -221,11 +222,11 @@ const DrugsPage = () => {
                     <div><Label>Expiry Date</Label><Input type="date" value={form.expiry_date} onChange={(e) => setForm({ ...form, expiry_date: e.target.value })} /></div>
                   </div>
                   <div><Label>Date of Purchase</Label><Input type="date" value={form.date_of_purchase} onChange={(e) => setForm({ ...form, date_of_purchase: e.target.value })} /></div>
-                  <div className="grid grid-cols-2 gap-4">
+                  <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
                     <div><Label>Buying Price (KSh)</Label><Input type="number" step="0.01" value={form.buying_price} onChange={(e) => setForm({ ...form, buying_price: e.target.value })} required /></div>
                     <div><Label>Selling Price (KSh)</Label><Input type="number" step="0.01" value={form.selling_price} onChange={(e) => setForm({ ...form, selling_price: e.target.value })} required /></div>
                   </div>
-                  <div className="grid grid-cols-2 gap-4">
+                  <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
                     <div><Label>Stock Quantity</Label><Input type="number" value={form.stock_quantity} onChange={(e) => setForm({ ...form, stock_quantity: e.target.value })} required /></div>
                     <div><Label>Low Stock Threshold</Label><Input type="number" value={form.low_stock_threshold} onChange={(e) => setForm({ ...form, low_stock_threshold: e.target.value })} required /></div>
                   </div>
@@ -237,13 +238,13 @@ const DrugsPage = () => {
         </div>
 
         <Card>
-          <CardContent className="p-0">
+          <CardContent className="overflow-hidden p-0">
             {loading ? (
               <div className="flex items-center justify-center h-32"><div className="animate-spin rounded-full h-6 w-6 border-b-2 border-primary" /></div>
             ) : drugs.length === 0 ? (
               <div className="p-6 text-center text-muted-foreground">No drugs yet. Click "Add Drug" to get started.</div>
             ) : (
-              <Table>
+              <Table className="min-w-[920px]">
                 <TableHeader>
                   <TableRow>
                     <TableHead>Name</TableHead>
@@ -274,8 +275,10 @@ const DrugsPage = () => {
                         </div>
                       </TableCell>
                       <TableCell className="text-right">
-                        <Button variant="ghost" size="icon" onClick={() => handleEdit(d)}><Pencil className="h-4 w-4" /></Button>
-                        <Button variant="ghost" size="icon" onClick={() => handleDelete(d)}><Trash2 className="h-4 w-4" /></Button>
+                        <div className="flex justify-end gap-1">
+                          <Button variant="ghost" size="icon" onClick={() => handleEdit(d)}><Pencil className="h-4 w-4" /></Button>
+                          <Button variant="ghost" size="icon" onClick={() => handleDelete(d)}><Trash2 className="h-4 w-4" /></Button>
+                        </div>
                       </TableCell>
                     </TableRow>
                   ))}
@@ -306,9 +309,8 @@ const DrugsPage = () => {
           <form onSubmit={handleVerifySensitiveAction} className="space-y-4">
             <div className="space-y-2">
               <Label htmlFor="inventory-owner-pin">Owner Security PIN</Label>
-              <Input
+              <PasswordInput
                 id="inventory-owner-pin"
-                type="password"
                 inputMode="numeric"
                 maxLength={6}
                 value={pin}
@@ -320,9 +322,8 @@ const DrugsPage = () => {
             {!hasOwnerSecurityPin && (
               <div className="space-y-2">
                 <Label htmlFor="inventory-owner-pin-confirm">Confirm Security PIN</Label>
-                <Input
+                <PasswordInput
                   id="inventory-owner-pin-confirm"
-                  type="password"
                   inputMode="numeric"
                   maxLength={6}
                   value={confirmPin}

@@ -41,6 +41,7 @@ const App = () => (
           <Suspense fallback={<RouteLoader />}>
             <Routes>
               <Route path="/" element={<Index />} />
+              <Route path="/home" element={<Index keepLandingVisible />} />
               <Route path="/login" element={<Login />} />
               <Route path="/register" element={<Register />} />
               <Route path="/dashboard" element={<ProtectedRoute allowedRoles={["admin"]} requireSensitiveVerification><Dashboard /></ProtectedRoute>} />

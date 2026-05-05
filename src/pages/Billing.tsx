@@ -553,7 +553,7 @@ const BillingPage = () => {
               </div>
 
               <div className="rounded-lg border p-4">
-                <div className="grid gap-4 md:grid-cols-[minmax(0,1fr)_120px_140px_160px] md:items-end">
+                <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_120px_140px_160px] lg:items-end">
                   <div>
                     <Label>Item</Label>
                     <Popover open={drugPickerOpen} onOpenChange={setDrugPickerOpen}>
@@ -661,7 +661,7 @@ const BillingPage = () => {
               </div>
 
               <div className="space-y-3">
-                <div className="flex items-center justify-between">
+                <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
                   <h3 className="text-lg font-semibold">Bill Items</h3>
                   <div className="text-right">
                     <p className="text-sm text-muted-foreground">{billItems.length} item(s)</p>
@@ -683,7 +683,7 @@ const BillingPage = () => {
                       const maxAllowedDiscountPercentage = getMaxDiscountPercentageForItem(item.itemName, item.quantity);
 
                       return (
-                        <div key={item.itemName} className="grid gap-3 rounded-lg border p-4 md:grid-cols-[minmax(0,1fr)_110px_120px_140px_48px] md:items-center">
+                        <div key={item.itemName} className="grid gap-3 rounded-lg border p-4 lg:grid-cols-[minmax(0,1fr)_110px_120px_140px_48px] lg:items-center">
                           <div>
                             <p className="font-medium">{item.itemName}</p>
                             <p className="text-sm text-muted-foreground">
@@ -706,7 +706,7 @@ const BillingPage = () => {
                             onChange={(e) => updateBillItemDiscount(item.itemName, e.target.value)}
                           />
                           <div className="font-semibold">KSh {lineTotal.toLocaleString()}</div>
-                          <Button type="button" variant="ghost" size="icon" onClick={() => removeBillItem(item.itemName)}>
+                          <Button type="button" variant="ghost" size="icon" className="justify-self-start lg:justify-self-auto" onClick={() => removeBillItem(item.itemName)}>
                             <Trash2 className="h-4 w-4" />
                           </Button>
                         </div>
@@ -726,14 +726,14 @@ const BillingPage = () => {
         {latestReceipt && (
           <Card>
             <CardHeader>
-              <CardTitle className="flex items-center justify-between gap-4">
+              <CardTitle className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                 <span>Latest Receipt</span>
-                <div className="flex gap-2">
-                  <Button type="button" variant="outline" onClick={() => handleDownloadReceiptPdf(latestReceipt)}>
+                <div className="flex flex-col gap-2 sm:flex-row">
+                  <Button type="button" className="w-full sm:w-auto" variant="outline" onClick={() => handleDownloadReceiptPdf(latestReceipt)}>
                     <Download className="mr-2 h-4 w-4" />
                     Download PDF
                   </Button>
-                  <Button type="button" onClick={() => handlePrintReceipt(latestReceipt)}>
+                  <Button type="button" className="w-full sm:w-auto" onClick={() => handlePrintReceipt(latestReceipt)}>
                     <Receipt className="mr-2 h-4 w-4" />
                     Print Receipt
                   </Button>
@@ -755,7 +755,7 @@ const BillingPage = () => {
               <div className="space-y-3">
                 {latestReceipt.lines.map((line) => (
                             <div key={line.itemName} className="rounded-lg border p-4">
-                    <div className="flex items-center justify-between gap-4">
+                    <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
                       <p className="font-medium">{line.itemName}</p>
                       <p className="font-semibold">KSh {line.lineTotal.toLocaleString()}</p>
                     </div>
@@ -774,9 +774,9 @@ const BillingPage = () => {
           </Card>
         )}
 
-        <div className="flex items-center justify-between">
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
           <h3 className="text-xl font-semibold">Billing History</h3>
-          <Button variant="outline" size="sm" onClick={() => exportToCSV(
+          <Button className="w-full sm:w-auto" variant="outline" size="sm" onClick={() => exportToCSV(
             transactions.map(t => ({
               Date: new Date(t.date).toLocaleDateString(),
               Item: getDrugById(t.drug_id || "")?.name || "-",
@@ -789,13 +789,13 @@ const BillingPage = () => {
           </Button>
         </div>
         <Card>
-          <CardContent className="p-0">
+          <CardContent className="overflow-hidden p-0">
             {loading ? (
               <div className="flex items-center justify-center h-32"><div className="animate-spin rounded-full h-6 w-6 border-b-2 border-primary" /></div>
             ) : groupedTransactions.length === 0 ? (
               <div className="p-6 text-center text-muted-foreground">No transactions yet.</div>
             ) : (
-              <Table>
+              <Table className="min-w-[960px]">
                 <TableHeader>
                   <TableRow>
                     <TableHead>Date</TableHead>

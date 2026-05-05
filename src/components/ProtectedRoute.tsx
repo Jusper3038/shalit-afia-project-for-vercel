@@ -4,7 +4,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import type { Enums } from "@/integrations/supabase/types";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
+import { PasswordInput } from "@/components/ui/password-input";
 import { Label } from "@/components/ui/label";
 import { toast } from "sonner";
 
@@ -133,9 +133,8 @@ const ProtectedRoute = ({
           <form onSubmit={handleVerify} className="space-y-4">
             <div className="space-y-2">
               <Label htmlFor="owner-security-pin">Owner Security PIN</Label>
-              <Input
+              <PasswordInput
                 id="owner-security-pin"
-                type="password"
                 inputMode="numeric"
                 maxLength={6}
                 value={pin}
@@ -147,9 +146,8 @@ const ProtectedRoute = ({
             {!hasOwnerSecurityPin && (
               <div className="space-y-2">
                 <Label htmlFor="confirm-owner-security-pin">Confirm Security PIN</Label>
-                <Input
+                <PasswordInput
                   id="confirm-owner-security-pin"
-                  type="password"
                   inputMode="numeric"
                   maxLength={6}
                   value={confirmPin}

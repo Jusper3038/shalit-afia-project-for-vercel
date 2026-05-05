@@ -123,14 +123,14 @@ const PaymentsPage = () => {
         </Card>
 
         {/* Payment History */}
-        <div className="flex items-center justify-between">
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
           <h3 className="text-xl font-semibold">Payment History</h3>
-          <Button variant="outline" size="sm" onClick={fetchPayments}>
+          <Button className="w-full sm:w-auto" variant="outline" size="sm" onClick={fetchPayments}>
             <RefreshCw className="mr-2 h-4 w-4" /> Refresh
           </Button>
         </div>
         <Card>
-          <CardContent className="p-0">
+          <CardContent className="overflow-hidden p-0">
             {loading ? (
               <div className="flex items-center justify-center h-32">
                 <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-primary" />
@@ -138,7 +138,7 @@ const PaymentsPage = () => {
             ) : payments.length === 0 ? (
               <div className="p-6 text-center text-muted-foreground">No payments recorded yet.</div>
             ) : (
-              <Table>
+              <Table className="min-w-[680px]">
                 <TableHeader>
                   <TableRow>
                     <TableHead>Date</TableHead>

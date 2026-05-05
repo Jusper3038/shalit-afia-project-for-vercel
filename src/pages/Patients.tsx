@@ -73,15 +73,15 @@ const PatientsPage = () => {
   return (
     <AppLayout>
       <div className="space-y-4">
-        <div className="flex items-center justify-between">
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
           <h2 className="text-2xl font-bold">Patients</h2>
-          <div className="flex gap-2">
-            <Button variant="outline" size="sm" onClick={() => exportToCSV(patients.map(p => ({ Name: p.name, Phone: p.phone, Diagnosis: p.diagnosis })), "patients-report")}>
+          <div className="flex flex-wrap gap-2">
+            <Button className="w-full sm:w-auto" variant="outline" size="sm" onClick={() => exportToCSV(patients.map(p => ({ Name: p.name, Phone: p.phone, Diagnosis: p.diagnosis })), "patients-report")}>
               <Download className="mr-2 h-4 w-4" />CSV
             </Button>
             <Dialog open={dialogOpen} onOpenChange={(o) => { setDialogOpen(o); if (!o) resetForm(); }}>
               <DialogTrigger asChild>
-                <Button size="sm"><Plus className="mr-2 h-4 w-4" />Add Patient</Button>
+                <Button className="w-full sm:w-auto" size="sm"><Plus className="mr-2 h-4 w-4" />Add Patient</Button>
               </DialogTrigger>
               <DialogContent>
                 <DialogHeader><DialogTitle>{editing ? "Edit Patient" : "Add Patient"}</DialogTitle></DialogHeader>
@@ -96,13 +96,13 @@ const PatientsPage = () => {
           </div>
         </div>
         <Card>
-          <CardContent className="p-0">
+          <CardContent className="overflow-hidden p-0">
             {loading ? (
               <div className="flex items-center justify-center h-32"><div className="animate-spin rounded-full h-6 w-6 border-b-2 border-primary" /></div>
             ) : patients.length === 0 ? (
               <div className="p-6 text-center text-muted-foreground">No patients yet.</div>
             ) : (
-              <Table>
+              <Table className="min-w-[640px]">
                 <TableHeader>
                   <TableRow>
                     <TableHead>Name</TableHead>
@@ -118,8 +118,10 @@ const PatientsPage = () => {
                       <TableCell>{p.phone || "-"}</TableCell>
                       <TableCell className="max-w-xs truncate">{p.diagnosis || "-"}</TableCell>
                       <TableCell className="text-right">
-                        <Button variant="ghost" size="icon" onClick={() => handleEdit(p)}><Pencil className="h-4 w-4" /></Button>
-                        <Button variant="ghost" size="icon" onClick={() => handleDelete(p)}><Trash2 className="h-4 w-4" /></Button>
+                        <div className="flex justify-end gap-1">
+                          <Button variant="ghost" size="icon" onClick={() => handleEdit(p)}><Pencil className="h-4 w-4" /></Button>
+                          <Button variant="ghost" size="icon" onClick={() => handleDelete(p)}><Trash2 className="h-4 w-4" /></Button>
+                        </div>
                       </TableCell>
                     </TableRow>
                   ))}
