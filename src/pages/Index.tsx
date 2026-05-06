@@ -160,10 +160,10 @@ const Index = ({ keepLandingVisible = false }: IndexProps) => {
           </div>
         </header>
 
-        <div className="relative z-10 mx-auto flex min-h-[70vh] w-full max-w-[1880px] items-center px-4 pb-14 pt-8 sm:px-8 lg:px-16 lg:pb-24">
-          <div className="max-w-2xl">
+        <div className="relative z-10 mx-auto grid min-h-[70vh] w-full max-w-[1880px] items-center gap-8 px-4 pb-14 pt-8 sm:px-8 lg:grid-cols-[minmax(0,0.88fr)_minmax(520px,0.82fr)] lg:px-16 lg:pb-20">
+          <div className="max-w-3xl">
             <p className="text-sm font-semibold text-cyan-400 uppercase tracking-widest">Clinic Operating System</p>
-            <h1 className="mt-4 text-5xl leading-tight tracking-tight sm:text-6xl lg:text-7xl font-bold text-white">
+            <h1 className="mt-4 text-5xl leading-tight tracking-tight text-white sm:text-6xl lg:text-7xl font-bold">
               Every patient journey deserves a clearer story.
             </h1>
             <p className="mt-6 text-lg text-white/70 max-w-lg leading-relaxed">
@@ -176,6 +176,23 @@ const Index = ({ keepLandingVisible = false }: IndexProps) => {
               <Button asChild size="lg" variant="outline" className="rounded-full border-white/20 bg-transparent text-white hover:bg-white/5">
                 <Link to="/login">Open dashboard</Link>
               </Button>
+            </div>
+          </div>
+
+          <div className="relative mx-auto hidden min-h-[560px] w-full max-w-[760px] items-center justify-center self-center pr-20 lg:flex xl:pr-28">
+            <div className="absolute left-1/2 top-1/2 h-72 w-[82%] -translate-x-1/2 -translate-y-1/2 rounded-full bg-cyan-300/20 blur-3xl" />
+            <div className="relative z-10 w-full">
+              <img
+                src="/images/clinician-tablet-hero.png"
+                alt="Black female clinician using SHALIT AFIA to coordinate clinic care"
+                className="h-[560px] w-full scale-110 object-cover object-[50%_42%] [mask-image:radial-gradient(ellipse_at_56%_48%,black_0%,black_58%,transparent_82%)] [-webkit-mask-image:radial-gradient(ellipse_at_56%_48%,black_0%,black_58%,transparent_82%)]"
+                loading="eager"
+                decoding="async"
+                onError={(event) => {
+                  event.currentTarget.src =
+                    "https://images.pexels.com/photos/19963169/pexels-photo-19963169.jpeg?auto=compress&cs=tinysrgb&w=1200";
+                }}
+              />
             </div>
           </div>
         </div>

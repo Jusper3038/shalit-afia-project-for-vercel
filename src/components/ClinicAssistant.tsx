@@ -6,12 +6,13 @@ import { Textarea } from "@/components/ui/textarea";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
 import { Badge } from "@/components/ui/badge";
-import { AlertTriangle, Bot, Loader2, PackageCheck, Send, Sparkles, TrendingUp } from "lucide-react";
+import { AlertTriangle, HeartPulse, Loader2, MessageCircle, PackageCheck, Send, Sparkles, TrendingUp } from "lucide-react";
 import type { Tables } from "@/integrations/supabase/types";
 import { getClinicDayKey, getClinicWeekStartKey, getMonthLabel, getTransactionSaleDay, getTransactionSaleMonth, getTransactionSaleYear } from "@/lib/reporting";
 import { getDaysUntilExpiry, isExpiredDrug, isExpiringSoonDrug } from "@/lib/inventory";
 
 const OLLAMA_MODEL = import.meta.env.VITE_OLLAMA_MODEL || "llama3.1:8b";
+const GEMINI_MODEL = import.meta.env.VITE_GEMINI_MODEL || "gemini-2.5-flash";
 
 type Message = {
   id: string;
@@ -183,14 +184,43 @@ const ClinicAssistant = () => {
       "Prefer short paragraphs or bullets.",
     ].join(" ");
 
-  const callOllama = async (prompt: string, history: Message[]) => {
-    const recentMessages = history
+  const buildRecentMessages = (history: Message[]) =>
+    history
       .slice(-6)
       .map((message) => ({
         role: message.role,
         content: message.text,
       }));
 
+  const callGemini = async (prompt: string, history: Message[]) => {
+    const response = await fetch("/api/gemini", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        model: GEMINI_MODEL,
+        snapshot: buildClinicSnapshot(),
+        prompt,
+        messages: buildRecentMessages(history),
+      }),
+    });
+
+    if (!response.ok) {
+      throw new Error(`Gemini request failed with status ${response.status}`);
+    }
+
+    const data = (await response.json()) as { reply?: string };
+    const content = data.reply?.trim();
+
+    if (!content) {
+      throw new Error("Gemini returned an empty response.");
+    }
+
+    return content;
+  };
+
+  const callOllama = async (prompt: string, history: Message[]) => {
     const response = await fetch("/api/ollama", {
       method: "POST",
       headers: {
@@ -200,7 +230,7 @@ const ClinicAssistant = () => {
         model: OLLAMA_MODEL,
         snapshot: buildClinicSnapshot(),
         prompt,
-        messages: recentMessages,
+        messages: buildRecentMessages(history),
       }),
     });
 
@@ -308,6 +338,10 @@ const ClinicAssistant = () => {
   const answerPrompt = (prompt: string) => {
     const normalized = prompt.toLowerCase();
 
+    if (/^(hi|hello|hey|good morning|good afternoon|good evening)\b/.test(normalized.trim())) {
+      return `Hello. I am here with ${profile?.clinic_name || "your clinic"}'s operating picture. You can ask me for today's report, stock risks, payments, profit, or revenue ideas.`;
+    }
+
     if (normalized.includes("today") || normalized.includes("daily report") || normalized.includes("today's report")) {
       return buildTodayReport();
     }
@@ -355,7 +389,7 @@ const ClinicAssistant = () => {
     const assistantMessage: Message = {
       id: `assistant-${Date.now() + 1}`,
       role: "assistant",
-      text: "Thinking with Ollama...",
+      text: "Checking your clinic data...",
     };
 
     setMessages((current) => [...current, userMessage, assistantMessage]);
@@ -364,18 +398,27 @@ const ClinicAssistant = () => {
     const runAssistant = async () => {
       setSending(true);
       try {
-        const reply = await callOllama(trimmed, nextMessages);
+        const reply = await callGemini(trimmed, nextMessages);
         setMessages((current) =>
           current.map((message) =>
             message.id === assistantMessage.id ? { ...message, text: reply } : message,
           ),
         );
       } catch {
-        setMessages((current) =>
-          current.map((message) =>
-            message.id === assistantMessage.id ? { ...message, text: answerPrompt(trimmed) } : message,
-          ),
-        );
+        try {
+          const reply = await callOllama(trimmed, nextMessages);
+          setMessages((current) =>
+            current.map((message) =>
+              message.id === assistantMessage.id ? { ...message, text: reply } : message,
+            ),
+          );
+        } catch {
+          setMessages((current) =>
+            current.map((message) =>
+              message.id === assistantMessage.id ? { ...message, text: answerPrompt(trimmed) } : message,
+            ),
+          );
+        }
       } finally {
         setSending(false);
       }
@@ -395,68 +438,69 @@ const ClinicAssistant = () => {
         <Button
           type="button"
           size="icon"
-          className="fixed bottom-5 right-5 z-40 h-14 w-14 rounded-full border border-white/25 bg-primary shadow-xl shadow-primary/25 transition-transform hover:-translate-y-1 hover:shadow-2xl sm:bottom-6 sm:right-6"
+          className="fixed bottom-5 right-5 z-40 h-16 w-16 rounded-2xl border border-cyan-200/40 bg-gradient-to-br from-cyan-400 to-primary text-primary-foreground shadow-2xl shadow-primary/30 transition-transform hover:-translate-y-1 hover:scale-105 sm:bottom-6 sm:right-6"
           aria-label="Open clinic assistant"
         >
-          <Bot className="h-6 w-6" />
-          <span className="absolute -right-0.5 -top-0.5 h-4 w-4 rounded-full border-2 border-background bg-emerald-500" />
+          <MessageCircle className="h-7 w-7" />
+          <span className="absolute -right-1 -top-1 h-5 w-5 rounded-full border-2 border-background bg-emerald-500 shadow-sm" />
         </Button>
       </SheetTrigger>
-      <SheetContent side="right" className="flex w-full max-w-full flex-col gap-0 overflow-hidden p-0 sm:max-w-xl">
-        <div className="border-b bg-card px-4 py-4 sm:px-5">
+      <SheetContent side="right" className="flex w-full max-w-full flex-col gap-0 overflow-hidden border-l-0 bg-slate-50 p-0 sm:max-w-xl">
+        <div className="relative overflow-hidden border-b bg-gradient-to-br from-slate-950 via-blue-950 to-slate-900 px-4 py-5 text-white sm:px-5">
+          <div className="absolute -right-12 -top-16 h-44 w-44 rounded-full bg-cyan-400/20 blur-3xl" />
           <SheetHeader className="text-left">
-            <div className="flex items-start gap-3 pr-8">
-              <div className="rounded-lg bg-primary p-2.5 text-primary-foreground shadow-sm">
-                <Sparkles className="h-5 w-5" />
+            <div className="relative flex items-start gap-3 pr-8">
+              <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl border border-white/15 bg-white/10 text-cyan-200 shadow-lg backdrop-blur">
+                <HeartPulse className="h-6 w-6" />
               </div>
               <div className="min-w-0">
                 <div className="flex flex-wrap items-center gap-2">
-                  <SheetTitle className="text-base sm:text-lg">Clinic Assistant</SheetTitle>
-                  <Badge className="h-6 rounded-md bg-emerald-500/15 px-2 text-emerald-700 hover:bg-emerald-500/15">
+                  <SheetTitle className="text-base text-white sm:text-lg">Shalit Care Copilot</SheetTitle>
+                  <Badge className="h-6 rounded-full border border-emerald-300/30 bg-emerald-400/15 px-2 text-emerald-100 hover:bg-emerald-400/15">
                     Live
                   </Badge>
                 </div>
-                <SheetDescription className="mt-1">
-                  Sales, stock, profit, payments, and growth answers from your clinic data.
+                <SheetDescription className="mt-1 text-white/70">
+                  Calm answers for sales, stock, payments, profit, and next best actions.
                 </SheetDescription>
               </div>
             </div>
           </SheetHeader>
 
-          <div className="mt-4 grid grid-cols-3 gap-2">
-            <div className="rounded-lg border bg-background px-3 py-2">
-              <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
-                <TrendingUp className="h-3.5 w-3.5 text-primary" />
+          <div className="relative mt-5 grid grid-cols-3 gap-2">
+            <div className="rounded-2xl border border-white/10 bg-white/10 px-3 py-3 backdrop-blur">
+              <div className="flex items-center gap-1.5 text-xs text-white/60">
+                <TrendingUp className="h-3.5 w-3.5 text-cyan-200" />
                 Today
               </div>
-              <p className="mt-1 truncate text-sm font-semibold">{formatCurrency(analytics.todaySales)}</p>
+              <p className="mt-1 truncate text-sm font-semibold text-white">{formatCurrency(analytics.todaySales)}</p>
             </div>
-            <div className="rounded-lg border bg-background px-3 py-2">
-              <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
-                <PackageCheck className="h-3.5 w-3.5 text-emerald-600" />
+            <div className="rounded-2xl border border-white/10 bg-white/10 px-3 py-3 backdrop-blur">
+              <div className="flex items-center gap-1.5 text-xs text-white/60">
+                <PackageCheck className="h-3.5 w-3.5 text-emerald-200" />
                 Stock
               </div>
-              <p className="mt-1 truncate text-sm font-semibold">{data.drugs.length} items</p>
+              <p className="mt-1 truncate text-sm font-semibold text-white">{data.drugs.length} items</p>
             </div>
-            <div className="rounded-lg border bg-background px-3 py-2">
-              <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
-                <AlertTriangle className="h-3.5 w-3.5 text-amber-600" />
+            <div className="rounded-2xl border border-white/10 bg-white/10 px-3 py-3 backdrop-blur">
+              <div className="flex items-center gap-1.5 text-xs text-white/60">
+                <AlertTriangle className="h-3.5 w-3.5 text-amber-200" />
                 Alerts
               </div>
-              <p className="mt-1 truncate text-sm font-semibold">
+              <p className="mt-1 truncate text-sm font-semibold text-white">
                 {analytics.lowStockItems.length + analytics.outOfStockItems.length + analytics.expiringItems.length}
               </p>
             </div>
           </div>
 
-          <div className="mt-3 flex flex-wrap gap-2">
-            <Badge variant="outline" className="rounded-md">{profile?.clinic_name || "Clinic"}</Badge>
-            <Badge variant="outline" className="rounded-md">{analytics.currentMonthLabel}</Badge>
-            <Badge variant="outline" className="rounded-md">{OLLAMA_MODEL}</Badge>
+          <div className="relative mt-3 flex flex-wrap gap-2">
+            <Badge variant="outline" className="rounded-full border-white/15 bg-white/10 text-white">{profile?.clinic_name || "Clinic"}</Badge>
+            <Badge variant="outline" className="rounded-full border-white/15 bg-white/10 text-white">{analytics.currentMonthLabel}</Badge>
+            <Badge variant="outline" className="rounded-full border-white/15 bg-white/10 text-white">{GEMINI_MODEL}</Badge>
           </div>
         </div>
 
-        <div className="border-b bg-background px-4 py-3 sm:px-5">
+        <div className="border-b bg-white px-4 py-3 sm:px-5">
           <div className="flex gap-2 overflow-x-auto pb-1">
           {quickPrompts.map((prompt) => (
             <Button
@@ -464,7 +508,7 @@ const ClinicAssistant = () => {
               type="button"
               variant="outline"
               size="sm"
-              className="shrink-0 rounded-full bg-card text-xs"
+              className="shrink-0 rounded-full border-slate-200 bg-slate-50 text-xs text-slate-700 hover:border-cyan-200 hover:bg-cyan-50 hover:text-slate-950"
               onClick={() => handlePrompt(prompt)}
             >
               {prompt}
@@ -473,7 +517,7 @@ const ClinicAssistant = () => {
           </div>
         </div>
 
-        <div className="min-h-0 flex-1 bg-muted/25">
+        <div className="min-h-0 flex-1 bg-[radial-gradient(circle_at_top_left,rgba(34,211,238,0.12),transparent_32%),#f8fafc]">
           <ScrollArea className="h-full">
             <div className="space-y-4 px-4 py-5 sm:px-5">
               {loading ? (
@@ -488,15 +532,15 @@ const ClinicAssistant = () => {
                     className={`flex gap-2 ${message.role === "user" ? "justify-end" : "justify-start"}`}
                   >
                     {message.role === "assistant" && (
-                      <div className="mt-1 flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border bg-card text-primary shadow-sm">
-                        <Bot className="h-4 w-4" />
+                      <div className="mt-1 flex h-9 w-9 shrink-0 items-center justify-center rounded-2xl border border-cyan-100 bg-white text-cyan-700 shadow-sm">
+                        <Sparkles className="h-4 w-4" />
                       </div>
                     )}
                     <div
-                      className={`max-w-[86%] rounded-lg px-4 py-3 text-sm leading-6 shadow-sm sm:max-w-[82%] ${
+                      className={`max-w-[86%] rounded-2xl px-4 py-3 text-sm leading-6 shadow-sm sm:max-w-[82%] ${
                         message.role === "assistant"
-                          ? "border bg-card text-foreground"
-                          : "bg-primary text-primary-foreground"
+                          ? "rounded-tl-md border border-slate-200 bg-white text-slate-800"
+                          : "rounded-tr-md bg-gradient-to-br from-primary to-cyan-600 text-primary-foreground"
                       }`}
                     >
                       <p className="whitespace-pre-line">{message.text}</p>
@@ -515,8 +559,8 @@ const ClinicAssistant = () => {
           </ScrollArea>
         </div>
 
-        <form onSubmit={handleSubmit} className="border-t bg-card p-3 sm:p-4">
-          <div className="flex items-end gap-2 rounded-lg border bg-background p-2 shadow-sm">
+        <form onSubmit={handleSubmit} className="border-t bg-white p-3 sm:p-4">
+          <div className="flex items-end gap-2 rounded-2xl border border-slate-200 bg-slate-50 p-2 shadow-sm focus-within:border-cyan-300 focus-within:ring-4 focus-within:ring-cyan-100">
             <Textarea
               value={input}
               onChange={(e) => setInput(e.target.value)}
@@ -531,7 +575,7 @@ const ClinicAssistant = () => {
               className="max-h-28 min-h-10 resize-none border-0 bg-transparent px-2 py-2 shadow-none focus-visible:ring-0 focus-visible:ring-offset-0"
               rows={1}
             />
-            <Button type="submit" size="icon" className="h-10 w-10 shrink-0 rounded-lg" disabled={loading || sending || !input.trim()}>
+            <Button type="submit" size="icon" className="h-10 w-10 shrink-0 rounded-xl bg-gradient-to-br from-primary to-cyan-600" disabled={loading || sending || !input.trim()}>
               {sending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
             </Button>
           </div>
