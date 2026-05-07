@@ -37,6 +37,7 @@ import {
   matchesSalesPeriod,
   type SalesPeriod,
 } from "@/lib/reporting";
+import { readClinicCache, withQueryTimeout, writeClinicCache } from "@/lib/clinic-cache";
 
 type AlertFilter = "all" | "expired" | "expiring" | "out" | "low";
 
@@ -61,17 +62,40 @@ const Dashboard = () => {
   useEffect(() => {
     if (!clinicOwnerId) return;
     const fetchData = async () => {
-      const [drugsRes, patientsRes, txRes] = await Promise.all([
-        supabase.from("drugs").select("*").eq("user_id", clinicOwnerId),
-        supabase.from("patients").select("*").eq("user_id", clinicOwnerId),
-        supabase.from("transactions").select("*").eq("user_id", clinicOwnerId),
-      ]);
-      setDrugs(drugsRes.data ?? []);
-      setPatients(patientsRes.data ?? []);
-      setTransactions(txRes.data ?? []);
+      const cached = readClinicCache<{
+        drugs: Tables<"drugs">[];
+        patients: Tables<"patients">[];
+        transactions: Tables<"transactions">[];
+      }>(clinicOwnerId, "dashboard");
+
+      if (cached) {
+        setDrugs(cached.drugs);
+        setPatients(cached.patients);
+        setTransactions(cached.transactions);
+        setLoading(false);
+      }
+
+      const [drugsRes, patientsRes, txRes] = await withQueryTimeout(
+        Promise.all([
+          supabase.from("drugs").select("*").eq("user_id", clinicOwnerId),
+          supabase.from("patients").select("*").eq("user_id", clinicOwnerId),
+          supabase.from("transactions").select("*").eq("user_id", clinicOwnerId).order("date", { ascending: false }).limit(3000),
+        ]),
+        [{ data: cached?.drugs ?? [] }, { data: cached?.patients ?? [] }, { data: cached?.transactions ?? [] }]
+      );
+
+      const nextData = {
+        drugs: drugsRes.data ?? [],
+        patients: patientsRes.data ?? [],
+        transactions: txRes.data ?? [],
+      };
+      setDrugs(nextData.drugs);
+      setPatients(nextData.patients);
+      setTransactions(nextData.transactions);
+      writeClinicCache(clinicOwnerId, "dashboard", nextData);
       setLoading(false);
     };
-    fetchData();
+    void fetchData();
   }, [clinicOwnerId]);
 
   useEffect(() => {

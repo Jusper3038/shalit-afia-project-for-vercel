@@ -10,6 +10,7 @@ import { AlertTriangle, HeartPulse, Loader2, MessageCircle, PackageCheck, Send, 
 import type { Tables } from "@/integrations/supabase/types";
 import { getClinicDayKey, getClinicWeekStartKey, getMonthLabel, getTransactionSaleDay, getTransactionSaleMonth, getTransactionSaleYear } from "@/lib/reporting";
 import { getDaysUntilExpiry, getExpiredStockCostLoss, getSellableStockQuantity, isExpiredDrug, isExpiringSoonDrug } from "@/lib/inventory";
+import { readClinicCache, withQueryTimeout, writeClinicCache } from "@/lib/clinic-cache";
 
 const OLLAMA_MODEL = import.meta.env.VITE_OLLAMA_MODEL || "llama3.1:8b";
 const GEMINI_MODEL = import.meta.env.VITE_GEMINI_MODEL || "gemini-2.5-flash";
@@ -63,22 +64,38 @@ const ClinicAssistant = () => {
     let cancelled = false;
 
     const fetchData = async () => {
-      setLoading(true);
-      const [drugsRes, patientsRes, paymentsRes, transactionsRes] = await Promise.all([
-        supabase.from("drugs").select("*").eq("user_id", clinicOwnerId),
-        supabase.from("patients").select("*").eq("user_id", clinicOwnerId),
-        supabase.from("payments").select("*").eq("user_id", clinicOwnerId),
-        supabase.from("transactions").select("*").eq("user_id", clinicOwnerId),
-      ]);
+      const cached = readClinicCache<AssistantData>(clinicOwnerId, "assistant");
+      if (cached) {
+        setData(cached);
+      } else {
+        setLoading(true);
+      }
+
+      const [drugsRes, patientsRes, paymentsRes, transactionsRes] = await withQueryTimeout(
+        Promise.all([
+          supabase.from("drugs").select("*").eq("user_id", clinicOwnerId),
+          supabase.from("patients").select("*").eq("user_id", clinicOwnerId),
+          supabase.from("payments").select("*").eq("user_id", clinicOwnerId).order("created_at", { ascending: false }).limit(100),
+          supabase.from("transactions").select("*").eq("user_id", clinicOwnerId).order("date", { ascending: false }).limit(1000),
+        ]),
+        [
+          { data: cached?.drugs ?? [] },
+          { data: cached?.patients ?? [] },
+          { data: cached?.payments ?? [] },
+          { data: cached?.transactions ?? [] },
+        ]
+      );
 
       if (cancelled) return;
 
-      setData({
+      const nextData = {
         drugs: drugsRes.data ?? [],
         patients: patientsRes.data ?? [],
         payments: paymentsRes.data ?? [],
         transactions: transactionsRes.data ?? [],
-      });
+      };
+      setData(nextData);
+      writeClinicCache(clinicOwnerId, "assistant", nextData);
       setLoading(false);
     };
 

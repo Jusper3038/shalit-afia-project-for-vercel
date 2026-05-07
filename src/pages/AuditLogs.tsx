@@ -5,6 +5,7 @@ import AppLayout from "@/components/AppLayout";
 import { Card, CardContent } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import type { Tables } from "@/integrations/supabase/types";
+import { readClinicCache, withQueryTimeout, writeClinicCache } from "@/lib/clinic-cache";
 
 const AuditLogsPage = () => {
   const { clinicOwnerId } = useAuth();
@@ -13,8 +14,20 @@ const AuditLogsPage = () => {
 
   useEffect(() => {
     if (!clinicOwnerId) return;
-    supabase.from("audit_logs").select("*").eq("user_id", clinicOwnerId).order("created_at", { ascending: false }).limit(100)
-      .then(({ data }) => { setLogs(data ?? []); setLoading(false); });
+    const cached = readClinicCache<Tables<"audit_logs">[]>(clinicOwnerId, "audit_logs");
+    if (cached) {
+      setLogs(cached);
+      setLoading(false);
+    }
+
+    void withQueryTimeout(
+      supabase.from("audit_logs").select("*").eq("user_id", clinicOwnerId).order("created_at", { ascending: false }).limit(100),
+      { data: cached ?? [], error: null }
+    ).then(({ data }) => {
+      setLogs(data ?? []);
+      writeClinicCache(clinicOwnerId, "audit_logs", data ?? []);
+      setLoading(false);
+    });
   }, [clinicOwnerId]);
 
   return (

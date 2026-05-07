@@ -12,6 +12,7 @@ import { toast } from "sonner";
 import { Phone, RefreshCw } from "lucide-react";
 import type { Tables } from "@/integrations/supabase/types";
 import PhoneNumberInput, { normalizePhoneNumber } from "@/components/PhoneNumberInput";
+import { readClinicCache, withQueryTimeout, writeClinicCache } from "@/lib/clinic-cache";
 
 const getErrorMessage = (error: unknown) => error instanceof Error ? error.message : "Failed to initiate M-Pesa payment";
 
@@ -26,12 +27,22 @@ const PaymentsPage = () => {
 
   const fetchPayments = async () => {
     if (!clinicOwnerId) return;
-    const { data } = await supabase
-      .from("payments")
-      .select("*")
-      .eq("user_id", clinicOwnerId)
-      .order("created_at", { ascending: false });
+    const cached = readClinicCache<Tables<"payments">[]>(clinicOwnerId, "payments");
+    if (cached) {
+      setPayments(cached);
+      setLoading(false);
+    }
+    const { data } = await withQueryTimeout(
+      supabase
+        .from("payments")
+        .select("*")
+        .eq("user_id", clinicOwnerId)
+        .order("created_at", { ascending: false })
+        .limit(100),
+      { data: cached ?? [], error: null }
+    );
     setPayments(data ?? []);
+    writeClinicCache(clinicOwnerId, "payments", data ?? []);
     setLoading(false);
   };
 

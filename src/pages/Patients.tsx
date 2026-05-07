@@ -15,6 +15,7 @@ import { toast } from "sonner";
 import { Plus, Pencil, Trash2, Download } from "lucide-react";
 import type { Tables } from "@/integrations/supabase/types";
 import PhoneNumberInput, { COUNTRY_CODES, normalizePhoneNumber } from "@/components/PhoneNumberInput";
+import { readClinicCache, withQueryTimeout, writeClinicCache } from "@/lib/clinic-cache";
 
 const splitPhoneNumber = (value?: string | null) => {
   const phone = value ?? "";
@@ -35,8 +36,17 @@ const PatientsPage = () => {
 
   const fetchPatients = async () => {
     if (!clinicOwnerId) return;
-    const { data } = await supabase.from("patients").select("*").eq("user_id", clinicOwnerId).order("created_at", { ascending: false });
+    const cached = readClinicCache<Tables<"patients">[]>(clinicOwnerId, "patients");
+    if (cached) {
+      setPatients(cached);
+      setLoading(false);
+    }
+    const { data } = await withQueryTimeout(
+      supabase.from("patients").select("*").eq("user_id", clinicOwnerId).order("created_at", { ascending: false }),
+      { data: cached ?? [], error: null }
+    );
     setPatients(data ?? []);
+    writeClinicCache(clinicOwnerId, "patients", data ?? []);
     setLoading(false);
   };
 

@@ -11,6 +11,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { toast } from "sonner";
 import { Inbox, Mail, Power, ShieldCheck, Trash2, Users as UsersIcon } from "lucide-react";
 import type { Enums, Tables } from "@/integrations/supabase/types";
+import { readClinicCache, withQueryTimeout, writeClinicCache } from "@/lib/clinic-cache";
 
 type SystemUser = {
   clinic_name: string;
@@ -39,8 +40,17 @@ const UsersPage = () => {
   const [updatingStatusUserId, setUpdatingStatusUserId] = useState<string | null>(null);
 
   const fetchUsers = async () => {
-    setLoadingUsers(true);
-    const { data, error } = await supabase.rpc("get_platform_accounts");
+    const cached = readClinicCache<SystemUser[]>(user?.id ?? null, "platform_users");
+    if (cached) {
+      setUsers(cached);
+      setLoadingUsers(false);
+    }
+
+    if (!cached) setLoadingUsers(true);
+    const { data, error } = await withQueryTimeout(
+      supabase.rpc("get_platform_accounts"),
+      { data: cached ?? [], error: null }
+    );
     setLoadingUsers(false);
 
     if (error) {
@@ -48,16 +58,27 @@ const UsersPage = () => {
       return;
     }
 
-    setUsers((data ?? []) as SystemUser[]);
+    const nextUsers = (data ?? []) as SystemUser[];
+    setUsers(nextUsers);
+    writeClinicCache(user?.id ?? null, "platform_users", nextUsers);
   };
 
   const fetchLeads = async () => {
-    setLoadingLeads(true);
-    const { data, error } = await supabase
-      .from("leads")
-      .select("*")
-      .order("created_at", { ascending: false })
-      .limit(8);
+    const cached = readClinicCache<LeadRow[]>(user?.id ?? null, "platform_leads");
+    if (cached) {
+      setLeads(cached);
+      setLoadingLeads(false);
+    }
+
+    if (!cached) setLoadingLeads(true);
+    const { data, error } = await withQueryTimeout(
+      supabase
+        .from("leads")
+        .select("*")
+        .order("created_at", { ascending: false })
+        .limit(8),
+      { data: cached ?? [], error: null }
+    );
     setLoadingLeads(false);
 
     if (error) {
@@ -65,7 +86,9 @@ const UsersPage = () => {
       return;
     }
 
-    setLeads((data ?? []) as LeadRow[]);
+    const nextLeads = (data ?? []) as LeadRow[];
+    setLeads(nextLeads);
+    writeClinicCache(user?.id ?? null, "platform_leads", nextLeads);
   };
 
   useEffect(() => {

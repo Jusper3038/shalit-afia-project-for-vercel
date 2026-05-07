@@ -16,6 +16,7 @@ import { toast } from "sonner";
 import { Plus, Pencil, Trash2, Download } from "lucide-react";
 import type { Tables } from "@/integrations/supabase/types";
 import { getExpiredStockCostLoss, getExpiryLabel, getSellableStockQuantity, isExpiredDrug, isExpiringSoonDrug } from "@/lib/inventory";
+import { readClinicCache, withQueryTimeout, writeClinicCache } from "@/lib/clinic-cache";
 
 const emptyDrugForm = {
   name: "",
@@ -55,8 +56,17 @@ const DrugsPage = () => {
 
   const fetchDrugs = async () => {
     if (!clinicOwnerId) return;
-    const { data } = await supabase.from("drugs").select("*").eq("user_id", clinicOwnerId).order("created_at", { ascending: false });
+    const cached = readClinicCache<Tables<"drugs">[]>(clinicOwnerId, "drugs");
+    if (cached) {
+      setDrugs(cached);
+      setLoading(false);
+    }
+    const { data } = await withQueryTimeout(
+      supabase.from("drugs").select("*").eq("user_id", clinicOwnerId).order("created_at", { ascending: false }),
+      { data: cached ?? [], error: null }
+    );
     setDrugs(data ?? []);
+    writeClinicCache(clinicOwnerId, "drugs", data ?? []);
     setLoading(false);
   };
 

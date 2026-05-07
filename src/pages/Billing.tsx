@@ -20,6 +20,7 @@ import { clampPercent, getDiscountedUnitPrice, getMaxDiscountPercentageForDrug, 
 import { getExpiryLabel, isExpiredDrug, isExpiringSoonDrug } from "@/lib/inventory";
 import { downloadReceiptPdf } from "@/lib/pdf-receipt";
 import { formatClinicDateTime } from "@/lib/reporting";
+import { readClinicCache, withQueryTimeout, writeClinicCache } from "@/lib/clinic-cache";
 
 type BillItem = {
   itemName: string;
@@ -77,14 +78,36 @@ const BillingPage = () => {
 
   const fetchAll = async () => {
     if (!clinicOwnerId) return;
-    const [pRes, dRes, tRes] = await Promise.all([
-      supabase.from("patients").select("*").eq("user_id", clinicOwnerId),
-      supabase.from("drugs").select("*").eq("user_id", clinicOwnerId),
-      supabase.from("transactions").select("*").eq("user_id", clinicOwnerId).order("date", { ascending: false }),
-    ]);
-    setPatients(pRes.data ?? []);
-    setDrugs(dRes.data ?? []);
-    setTransactions(tRes.data ?? []);
+    const cached = readClinicCache<{
+      patients: Tables<"patients">[];
+      drugs: Tables<"drugs">[];
+      transactions: Tables<"transactions">[];
+    }>(clinicOwnerId, "billing");
+
+    if (cached) {
+      setPatients(cached.patients);
+      setDrugs(cached.drugs);
+      setTransactions(cached.transactions);
+      setLoading(false);
+    }
+
+    const [pRes, dRes, tRes] = await withQueryTimeout(
+      Promise.all([
+        supabase.from("patients").select("*").eq("user_id", clinicOwnerId),
+        supabase.from("drugs").select("*").eq("user_id", clinicOwnerId),
+        supabase.from("transactions").select("*").eq("user_id", clinicOwnerId).order("date", { ascending: false }).limit(500),
+      ]),
+      [{ data: cached?.patients ?? [] }, { data: cached?.drugs ?? [] }, { data: cached?.transactions ?? [] }]
+    );
+    const nextData = {
+      patients: pRes.data ?? [],
+      drugs: dRes.data ?? [],
+      transactions: tRes.data ?? [],
+    };
+    setPatients(nextData.patients);
+    setDrugs(nextData.drugs);
+    setTransactions(nextData.transactions);
+    writeClinicCache(clinicOwnerId, "billing", nextData);
     setLoading(false);
   };
 

@@ -10,6 +10,8 @@ import { toast } from "sonner";
 import { Copy, Plus, XCircle } from "lucide-react";
 import { APP_PERMISSION_OPTIONS, type AppPermission } from "@/lib/app-permissions";
 import PhoneNumberInput, { normalizePhoneNumber } from "@/components/PhoneNumberInput";
+import { readClinicCache, withQueryTimeout, writeClinicCache } from "@/lib/clinic-cache";
+import { useAuth } from "@/contexts/AuthContext";
 
 type ClinicInvite = {
   id: string;
@@ -25,6 +27,7 @@ type ClinicInvite = {
 };
 
 const TeamUsersSettings = () => {
+  const { clinicOwnerId } = useAuth();
   const [invites, setInvites] = useState<ClinicInvite[]>([]);
   const [email, setEmail] = useState("");
   const [countryCode, setCountryCode] = useState("+254");
@@ -41,8 +44,17 @@ const TeamUsersSettings = () => {
   );
 
   const fetchInvites = async () => {
-    setLoading(true);
-    const { data, error } = await supabase.rpc("get_clinic_user_invites");
+    const cached = readClinicCache<ClinicInvite[]>(clinicOwnerId, "clinic_invites");
+    if (cached) {
+      setInvites(cached);
+      setLoading(false);
+    }
+
+    if (!cached) setLoading(true);
+    const { data, error } = await withQueryTimeout(
+      supabase.rpc("get_clinic_user_invites"),
+      { data: cached ?? [], error: null }
+    );
     setLoading(false);
 
     if (error) {
@@ -50,7 +62,9 @@ const TeamUsersSettings = () => {
       return;
     }
 
-    setInvites((data ?? []) as ClinicInvite[]);
+    const nextInvites = (data ?? []) as ClinicInvite[];
+    setInvites(nextInvites);
+    writeClinicCache(clinicOwnerId, "clinic_invites", nextInvites);
   };
 
   useEffect(() => {
