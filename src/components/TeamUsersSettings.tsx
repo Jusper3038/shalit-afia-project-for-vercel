@@ -78,11 +78,21 @@ const TeamUsersSettings = () => {
     }
 
     setCreating(true);
-    const { data, error } = await supabase.rpc("create_clinic_user_invite", {
+    let { data, error } = await supabase.rpc("create_clinic_user_invite", {
       p_invited_email: invitedEmail,
       p_allowed_apps: selectedApps,
       p_invited_phone: normalizedPhone,
     });
+
+    if (error && /could not find.*function|function.*does not exist/i.test(error.message)) {
+      const fallbackResult = await supabase.rpc("create_clinic_user_invite", {
+        p_invited_email: invitedEmail,
+        p_allowed_apps: selectedApps,
+      });
+      data = fallbackResult.data;
+      error = fallbackResult.error;
+    }
+
     setCreating(false);
 
     if (error) {
