@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { Link, useNavigate, useSearchParams } from "react-router-dom";
+import { Link, useLocation, useNavigate, useSearchParams } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -15,6 +15,8 @@ const Login = () => {
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
   const navigate = useNavigate();
+  const location = useLocation();
+  const redirectPath = (location.state as { from?: string } | null)?.from ?? "/pharmacy/billing";
 
   useEffect(() => {
     const blockedMessage = sessionStorage.getItem("auth_blocked_message");
@@ -38,7 +40,7 @@ const Login = () => {
     } else {
       sessionStorage.setItem("show_owner_greeting", "true");
       toast.success("Logged in successfully!");
-      navigate("/");
+      navigate(redirectPath, { replace: true });
     }
   };
 

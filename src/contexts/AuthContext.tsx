@@ -1,4 +1,4 @@
-import { createContext, useContext, useEffect, useState, ReactNode } from "react";
+import { createContext, useContext, useEffect, useRef, useState, ReactNode } from "react";
 import { Session, User } from "@supabase/supabase-js";
 import { supabase } from "@/integrations/supabase/client";
 import type { Tables } from "@/integrations/supabase/types";
@@ -6,7 +6,7 @@ import { ALL_APP_PERMISSIONS, type AppPermission } from "@/lib/app-permissions";
 
 const SENSITIVE_ACCESS_KEY = "sensitive_access_verified_at";
 const SENSITIVE_ACCESS_WINDOW_MS = 15 * 60 * 1000;
-const REQUEST_TIMEOUT_MS = 8000;
+const REQUEST_TIMEOUT_MS = 4500;
 
 const withTimeout = async <T,>(promise: Promise<T>, fallback: T): Promise<T> => {
   let timeoutId: number | undefined;
@@ -78,6 +78,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const [isPlatformOwnerReady, setIsPlatformOwnerReady] = useState(false);
   const [hasOwnerSecurityPin, setHasOwnerSecurityPin] = useState(false);
   const [loading, setLoading] = useState(true);
+  const loadVersionRef = useRef(0);
 
   const fetchProfile = async (userId: string) => {
     const { data } = await withTimeout(
@@ -149,6 +150,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
   useEffect(() => {
     const loadSessionContext = (session: Session | null) => {
+      const loadVersion = ++loadVersionRef.current;
       setSession(session);
       setUser(session?.user ?? null);
       if (session?.user) {
@@ -157,7 +159,11 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
           fetchRole(session.user.id),
           fetchPlatformOwnerStatus(session.user.id),
           fetchOwnerSecurityPinStatus(),
-        ]).finally(() => setLoading(false));
+        ]).finally(() => {
+          if (loadVersion === loadVersionRef.current) {
+            setLoading(false);
+          }
+        });
       } else {
         setProfile(null);
         setRole(null);
@@ -166,12 +172,20 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         setIsPlatformOwner(false);
         setIsPlatformOwnerReady(false);
         setHasOwnerSecurityPin(false);
-        setLoading(false);
+        if (loadVersion === loadVersionRef.current) {
+          setLoading(false);
+        }
       }
     };
 
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
-      async (_event, session) => {
+      async (event, session) => {
+        if (event === "TOKEN_REFRESHED") {
+          setSession(session);
+          setUser(session?.user ?? null);
+          return;
+        }
+
         setLoading(true);
         setTimeout(() => loadSessionContext(session), 0);
       }

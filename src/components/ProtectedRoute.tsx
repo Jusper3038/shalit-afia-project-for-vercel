@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Navigate, useNavigate } from "react-router-dom";
+import { Navigate, useLocation, useNavigate } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
 import type { Enums } from "@/integrations/supabase/types";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
@@ -46,6 +46,7 @@ const ProtectedRoute = ({
   const [submitting, setSubmitting] = useState(false);
   const [sendingReset, setSendingReset] = useState(false);
   const navigate = useNavigate();
+  const location = useLocation();
 
   if (loading) {
     return (
@@ -56,7 +57,7 @@ const ProtectedRoute = ({
   }
 
   if (!session) {
-    return <Navigate to="/login" replace />;
+    return <Navigate to="/login" replace state={{ from: location.pathname + location.search }} />;
   }
 
   if (allowedRoles && (!role || !allowedRoles.includes(role as Enums<"app_role">))) {
