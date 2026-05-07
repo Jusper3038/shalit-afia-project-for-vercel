@@ -18,6 +18,10 @@ type GeminiResponse = {
   };
 };
 
+export const config = {
+  runtime: "nodejs",
+};
+
 const buildSystemPrompt = (snapshot: string) =>
   [
     "You are Shalit Care Copilot, a calm clinic operations assistant for Shalit Afia.",
@@ -48,6 +52,16 @@ const normalizeMessages = (messages: unknown): ChatMessage[] => {
 
 const toGeminiRole = (role: ChatMessage["role"]) => (role === "assistant" ? "model" : "user");
 
+const readBody = (body: unknown) => {
+  if (typeof body !== "string") return body ?? {};
+
+  try {
+    return JSON.parse(body);
+  } catch {
+    return {};
+  }
+};
+
 export default async function handler(req: any, res: any) {
   if (req.method !== "POST") {
     res.setHeader("Allow", "POST");
@@ -58,11 +72,11 @@ export default async function handler(req: any, res: any) {
 
   if (!apiKey) {
     return res.status(503).json({
-      error: "Gemini API key is not configured. Set GEMINI_API_KEY in your environment.",
+      error: "Gemini API key is not configured. Set GEMINI_API_KEY in the Vercel project environment variables, then redeploy.",
     });
   }
 
-  const body = typeof req.body === "string" ? JSON.parse(req.body) : req.body ?? {};
+  const body = readBody(req.body);
   const prompt = typeof body.prompt === "string" ? body.prompt : "";
   const snapshot = typeof body.snapshot === "string" ? body.snapshot : "";
   const model =

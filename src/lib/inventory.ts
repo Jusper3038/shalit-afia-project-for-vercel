@@ -33,6 +33,24 @@ export const isExpiringSoonDrug = (drug: Tables<"drugs">) => {
   return daysUntilExpiry !== null && daysUntilExpiry >= 0 && daysUntilExpiry <= EXPIRY_WARNING_DAYS;
 };
 
+export const getSellableStockQuantity = (drug: Tables<"drugs">) =>
+  isExpiredDrug(drug) ? 0 : drug.stock_quantity;
+
+export const getExpiredStockQuantity = (drug: Tables<"drugs">) =>
+  isExpiredDrug(drug) ? drug.stock_quantity : 0;
+
+export const getSellableCostValue = (drug: Tables<"drugs">) =>
+  Number(drug.buying_price) * getSellableStockQuantity(drug);
+
+export const getSellableRetailValue = (drug: Tables<"drugs">) =>
+  Number(drug.selling_price) * getSellableStockQuantity(drug);
+
+export const getExpiredStockCostLoss = (drug: Tables<"drugs">) =>
+  Number(drug.buying_price) * getExpiredStockQuantity(drug);
+
+export const getExpiredStockRetailLoss = (drug: Tables<"drugs">) =>
+  Number(drug.selling_price) * getExpiredStockQuantity(drug);
+
 export const getExpiryLabel = (drug: Tables<"drugs">) => {
   const daysUntilExpiry = getDaysUntilExpiry(drug.expiry_date);
   if (daysUntilExpiry === null) return "No expiry";

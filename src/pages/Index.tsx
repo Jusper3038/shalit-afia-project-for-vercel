@@ -126,7 +126,7 @@ const Index = ({ keepLandingVisible = false }: IndexProps) => {
   }
 
   if (session && !keepLandingVisible) {
-    return <Navigate to={role === "admin" ? "/dashboard" : "/billing"} replace />;
+    return <Navigate to={role === "admin" ? "/pharmacy/dashboard" : "/pharmacy/billing"} replace />;
   }
 
   return (
@@ -160,10 +160,10 @@ const Index = ({ keepLandingVisible = false }: IndexProps) => {
           </div>
         </header>
 
-        <div className="relative z-10 mx-auto grid min-h-[70vh] w-full max-w-[1880px] items-center gap-8 px-4 pb-14 pt-8 sm:px-8 lg:grid-cols-[minmax(0,0.88fr)_minmax(520px,0.82fr)] lg:px-16 lg:pb-20">
+        <div className="relative z-10 mx-auto grid min-h-[70vh] w-full max-w-[1880px] items-center gap-8 px-4 pb-14 pt-6 sm:px-8 lg:grid-cols-[minmax(0,0.88fr)_minmax(520px,0.82fr)] lg:px-16 lg:pb-20 lg:pt-8">
           <div className="max-w-3xl">
             <p className="text-sm font-semibold text-cyan-400 uppercase tracking-widest">Clinic Operating System</p>
-            <h1 className="mt-4 text-5xl leading-tight tracking-tight text-white sm:text-6xl lg:text-7xl font-bold">
+            <h1 className="mt-4 text-4xl leading-tight tracking-tight text-white sm:text-6xl lg:text-7xl font-bold">
               Every patient journey deserves a clearer story.
             </h1>
             <p className="mt-6 text-lg text-white/70 max-w-lg leading-relaxed">
@@ -179,13 +179,13 @@ const Index = ({ keepLandingVisible = false }: IndexProps) => {
             </div>
           </div>
 
-          <div className="relative mx-auto hidden min-h-[560px] w-full max-w-[760px] items-center justify-center self-center pr-20 lg:flex xl:pr-28">
-            <div className="absolute left-1/2 top-1/2 h-72 w-[82%] -translate-x-1/2 -translate-y-1/2 rounded-full bg-cyan-300/20 blur-3xl" />
-            <div className="relative z-10 w-full">
+          <div className="relative mx-auto flex min-h-[300px] w-full max-w-[520px] items-center justify-center self-center overflow-visible sm:min-h-[420px] sm:max-w-[640px] lg:min-h-[560px] lg:max-w-[760px] lg:pr-20 xl:pr-28">
+            <div className="absolute left-1/2 top-1/2 h-56 w-[92%] -translate-x-1/2 -translate-y-1/2 rounded-full bg-cyan-300/20 blur-3xl sm:h-72 lg:w-[82%]" />
+            <div className="relative z-10 w-full overflow-hidden rounded-[2rem] border border-white/10 bg-white/[0.03] shadow-2xl shadow-cyan-950/30 lg:overflow-visible lg:rounded-none lg:border-0 lg:bg-transparent lg:shadow-none">
               <img
                 src="/images/clinician-tablet-hero.png"
                 alt="Black female clinician using SHALIT AFIA to coordinate clinic care"
-                className="h-[560px] w-full scale-110 object-cover object-[50%_42%] [mask-image:radial-gradient(ellipse_at_56%_48%,black_0%,black_58%,transparent_82%)] [-webkit-mask-image:radial-gradient(ellipse_at_56%_48%,black_0%,black_58%,transparent_82%)]"
+                className="h-[300px] w-full object-cover object-[52%_30%] sm:h-[420px] lg:h-[560px] lg:scale-110 lg:object-[50%_42%] lg:[mask-image:radial-gradient(ellipse_at_56%_48%,black_0%,black_58%,transparent_82%)] lg:[-webkit-mask-image:radial-gradient(ellipse_at_56%_48%,black_0%,black_58%,transparent_82%)]"
                 loading="eager"
                 decoding="async"
                 onError={(event) => {

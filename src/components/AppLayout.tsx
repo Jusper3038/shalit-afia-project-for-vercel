@@ -1,10 +1,11 @@
 import { Suspense, lazy, useEffect, useState } from "react";
-import { Link } from "react-router-dom";
+import { NavLink, useLocation, useNavigate } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { cn } from "@/lib/utils";
 import { toast } from "sonner";
 import {
   LayoutDashboard,
@@ -20,30 +21,48 @@ import {
   Heart,
   Home,
   Sparkles,
+  ChevronDown,
 } from "lucide-react";
 
 const ClinicAssistant = lazy(() => import("@/components/ClinicAssistant"));
 
 const navItems = [
   { to: "/home", label: "Home", icon: Home, ownerOnly: false },
-  { to: "/dashboard", label: "Dashboard", icon: LayoutDashboard, ownerOnly: true },
-  { to: "/drugs", label: "Inventory", icon: Pill, ownerOnly: true },
-  { to: "/patients", label: "Patients", icon: Users, ownerOnly: false },
-  { to: "/billing", label: "Billing", icon: Receipt, ownerOnly: false },
   { to: "/payments", label: "Payments", icon: CreditCard, ownerOnly: true },
   { to: "/users", label: "Platform Accounts", icon: Users, ownerOnly: false, platformOnly: true },
   { to: "/audit-logs", label: "Audit Logs", icon: ScrollText, ownerOnly: true },
   { to: "/settings", label: "Settings", icon: Settings, ownerOnly: true },
 ];
 
+const pharmacyNavItems = [
+  { to: "/pharmacy/dashboard", label: "Dashboard", icon: LayoutDashboard, ownerOnly: true },
+  { to: "/pharmacy/inventory", label: "Inventory", icon: Pill, ownerOnly: true },
+  { to: "/pharmacy/patients", label: "Patients", icon: Users, ownerOnly: false },
+  { to: "/pharmacy/billing", label: "Billing", icon: Receipt, ownerOnly: false },
+];
+
 const AppLayout = ({ children }: { children: React.ReactNode }) => {
   const { profile, role, isPlatformOwner, signOut } = useAuth();
+  const location = useLocation();
+  const navigate = useNavigate();
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [pharmacyExpanded, setPharmacyExpanded] = useState(false);
   const [ownerGreeting, setOwnerGreeting] = useState<string | null>(null);
   const visibleNavItems = navItems.filter((item) => {
     if (item.platformOnly) return isPlatformOwner;
     return !item.ownerOnly || role === "admin";
   });
+  const visiblePharmacyNavItems = pharmacyNavItems.filter((item) => !item.ownerOnly || role === "admin");
+  const isPharmacyRoute = location.pathname.startsWith("/pharmacy");
+  const selectedPharmacyModule = visiblePharmacyNavItems.some((item) => item.to === location.pathname);
+
+  const handlePharmacyClick = () => {
+    setPharmacyExpanded((expanded) => !expanded);
+
+    if (!isPharmacyRoute) {
+      navigate("/pharmacy");
+    }
+  };
 
   useEffect(() => {
     const shouldShowGreeting = sessionStorage.getItem("show_owner_greeting") === "true";
@@ -96,16 +115,69 @@ const AppLayout = ({ children }: { children: React.ReactNode }) => {
           </Button>
         </div>
         <nav className="flex flex-1 flex-col gap-1 overflow-y-auto p-3">
+          {visiblePharmacyNavItems.length > 0 && (
+            <div className="space-y-1">
+              <button
+                type="button"
+                onClick={handlePharmacyClick}
+                className={cn(
+                  "flex w-full items-center gap-3 rounded-md px-3 py-2 text-left text-sm font-semibold transition-colors",
+                  isPharmacyRoute
+                    ? "bg-primary/10 text-primary"
+                    : "text-muted-foreground hover:bg-accent hover:text-accent-foreground",
+                )}
+                aria-expanded={pharmacyExpanded}
+              >
+                <Pill className="h-4 w-4" />
+                <span className="flex-1">Pharmacy</span>
+                <ChevronDown
+                  className={cn(
+                    "h-4 w-4 transition-transform",
+                    pharmacyExpanded && "rotate-180",
+                  )}
+                />
+              </button>
+              {pharmacyExpanded && (
+                <div className="ml-5 space-y-1 border-l pl-2">
+                  {visiblePharmacyNavItems.map((item) => (
+                    <NavLink
+                      key={item.to}
+                      to={item.to}
+                      onClick={() => setSidebarOpen(false)}
+                      className={({ isActive }) =>
+                        cn(
+                          "flex items-center gap-3 rounded-md px-3 py-2 text-sm font-medium transition-colors",
+                          isActive
+                            ? "bg-accent text-accent-foreground"
+                            : "text-muted-foreground hover:bg-accent hover:text-accent-foreground",
+                        )
+                      }
+                    >
+                      <item.icon className="h-4 w-4" />
+                      {item.label}
+                    </NavLink>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
           {visibleNavItems.map((item) => (
-            <Link
+            <NavLink
               key={item.to}
               to={item.to}
               onClick={() => setSidebarOpen(false)}
-              className="flex items-center gap-3 rounded-md px-3 py-2 text-sm font-medium text-muted-foreground hover:bg-accent hover:text-accent-foreground transition-colors"
+              className={({ isActive }) =>
+                cn(
+                  "flex items-center gap-3 rounded-md px-3 py-2 text-sm font-medium transition-colors",
+                  isActive
+                    ? "bg-accent text-accent-foreground"
+                    : "text-muted-foreground hover:bg-accent hover:text-accent-foreground",
+                )
+              }
             >
               <item.icon className="h-4 w-4" />
               {item.label}
-            </Link>
+            </NavLink>
           ))}
         </nav>
         <div className="mt-auto hidden border-t p-3 lg:block">
@@ -151,6 +223,33 @@ const AppLayout = ({ children }: { children: React.ReactNode }) => {
                 <Button variant="ghost" size="sm" className="self-start" onClick={() => setOwnerGreeting(null)}>
                   Dismiss
                 </Button>
+              </div>
+            </div>
+          )}
+          {selectedPharmacyModule && visiblePharmacyNavItems.length > 0 && (
+            <div className="mb-6 space-y-3">
+              <div>
+                <p className="text-xs font-semibold uppercase tracking-[0.18em] text-primary">Module</p>
+                <h2 className="text-2xl font-bold tracking-tight sm:text-3xl">Pharmacy</h2>
+              </div>
+              <div className="flex gap-2 overflow-x-auto pb-1">
+                {visiblePharmacyNavItems.map((item) => (
+                  <NavLink
+                    key={item.to}
+                    to={item.to}
+                    className={({ isActive }) =>
+                      cn(
+                        "inline-flex min-h-10 shrink-0 items-center gap-2 rounded-md border px-3 text-sm font-medium transition-colors",
+                        isActive
+                          ? "border-primary bg-primary text-primary-foreground"
+                          : "bg-card text-muted-foreground hover:bg-accent hover:text-accent-foreground",
+                      )
+                    }
+                  >
+                    <item.icon className="h-4 w-4" />
+                    {item.label}
+                  </NavLink>
+                ))}
               </div>
             </div>
           )}

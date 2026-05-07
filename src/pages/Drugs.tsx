@@ -15,7 +15,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { toast } from "sonner";
 import { Plus, Pencil, Trash2, Download } from "lucide-react";
 import type { Tables } from "@/integrations/supabase/types";
-import { getExpiryLabel, isExpiredDrug, isExpiringSoonDrug } from "@/lib/inventory";
+import { getExpiredStockCostLoss, getExpiryLabel, getSellableStockQuantity, isExpiredDrug, isExpiringSoonDrug } from "@/lib/inventory";
 
 const emptyDrugForm = {
   name: "",
@@ -182,8 +182,10 @@ const DrugsPage = () => {
   };
 
   const getStockBadge = (drug: Tables<"drugs">) => {
-    if (drug.stock_quantity === 0) return <Badge variant="destructive">OUT OF STOCK</Badge>;
-    if (drug.stock_quantity <= drug.low_stock_threshold) return <Badge className="bg-yellow-500 text-yellow-950">LOW STOCK</Badge>;
+    const usableStock = getSellableStockQuantity(drug);
+    if (isExpiredDrug(drug) && drug.stock_quantity > 0) return <Badge variant="destructive">DEDUCTED</Badge>;
+    if (usableStock === 0) return <Badge variant="destructive">OUT OF STOCK</Badge>;
+    if (usableStock <= drug.low_stock_threshold) return <Badge className="bg-yellow-500 text-yellow-950">LOW STOCK</Badge>;
     return <Badge className="bg-green-500 text-green-950">In Stock</Badge>;
   };
 
@@ -204,7 +206,7 @@ const DrugsPage = () => {
         <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
           <h2 className="text-2xl font-bold">Inventory</h2>
           <div className="flex flex-wrap gap-2">
-            <Button className="w-full sm:w-auto" variant="outline" size="sm" onClick={() => exportToCSV(drugs.map(d => ({ Name: d.name, "Serial Number": d.serial_number ?? "", "Expiry Date": d.expiry_date ?? "", "Date of Purchase": d.date_of_purchase ?? "", "Buying Price": d.buying_price, "Selling Price": d.selling_price, Stock: d.stock_quantity })), "drugs-report")}>
+            <Button className="w-full sm:w-auto" variant="outline" size="sm" onClick={() => exportToCSV(drugs.map(d => ({ Name: d.name, "Serial Number": d.serial_number ?? "", "Expiry Date": d.expiry_date ?? "", "Date of Purchase": d.date_of_purchase ?? "", "Buying Price": d.buying_price, "Selling Price": d.selling_price, "Usable Stock": getSellableStockQuantity(d), "Physical Stock": d.stock_quantity, "Expired Stock Loss": getExpiredStockCostLoss(d) })), "drugs-report")}>
               <Download className="mr-2 h-4 w-4" />CSV
             </Button>
             <Dialog open={dialogOpen} onOpenChange={(o) => { setDialogOpen(o); if (!o) resetForm(); }}>
@@ -253,7 +255,8 @@ const DrugsPage = () => {
                     <TableHead>Purchased</TableHead>
                     <TableHead>Buy Price</TableHead>
                     <TableHead>Sell Price</TableHead>
-                    <TableHead>Stock</TableHead>
+                    <TableHead>Usable Stock</TableHead>
+                    <TableHead>Physical Stock</TableHead>
                     <TableHead>Status</TableHead>
                     <TableHead className="text-right">Actions</TableHead>
                   </TableRow>
@@ -267,6 +270,7 @@ const DrugsPage = () => {
                       <TableCell>{formatDate(d.date_of_purchase)}</TableCell>
                       <TableCell>KSh {Number(d.buying_price).toLocaleString()}</TableCell>
                       <TableCell>KSh {Number(d.selling_price).toLocaleString()}</TableCell>
+                      <TableCell>{getSellableStockQuantity(d)}</TableCell>
                       <TableCell>{d.stock_quantity}</TableCell>
                       <TableCell>
                         <div className="flex flex-wrap gap-2">

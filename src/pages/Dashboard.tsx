@@ -9,7 +9,16 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { DollarSign, Users, Package2, Receipt, AlertTriangle, Download } from "lucide-react";
 import AppLayout from "@/components/AppLayout";
 import type { Tables } from "@/integrations/supabase/types";
-import { getExpiryLabel, isExpiredDrug, isExpiringSoonDrug } from "@/lib/inventory";
+import {
+  getExpiredStockCostLoss,
+  getExpiredStockQuantity,
+  getExpiryLabel,
+  getSellableCostValue,
+  getSellableRetailValue,
+  getSellableStockQuantity,
+  isExpiredDrug,
+  isExpiringSoonDrug,
+} from "@/lib/inventory";
 import { exportToCSV } from "@/lib/csv-export";
 import { Bar, BarChart, CartesianGrid, Line, LineChart, XAxis, YAxis } from "recharts";
 import { ChartContainer, ChartTooltip, ChartTooltipContent } from "@/components/ui/chart";
@@ -89,12 +98,15 @@ const Dashboard = () => {
   const profitMade = totalSales - estimatedCostOfGoodsSold;
   const totalPatients = patients.length;
   const totalBills = filteredTransactions.length;
-  const totalItemsInStock = drugs.reduce((sum, d) => sum + d.stock_quantity, 0);
-  const inventoryCostValue = drugs.reduce((sum, d) => sum + Number(d.buying_price) * d.stock_quantity, 0);
-  const inventoryRetailValue = drugs.reduce((sum, d) => sum + Number(d.selling_price) * d.stock_quantity, 0);
+  const totalItemsInStock = drugs.reduce((sum, d) => sum + getSellableStockQuantity(d), 0);
+  const expiredStockUnits = drugs.reduce((sum, d) => sum + getExpiredStockQuantity(d), 0);
+  const expiredStockCostLoss = drugs.reduce((sum, d) => sum + getExpiredStockCostLoss(d), 0);
+  const netProfitAfterExpiredLoss = profitMade - expiredStockCostLoss;
+  const inventoryCostValue = drugs.reduce((sum, d) => sum + getSellableCostValue(d), 0);
+  const inventoryRetailValue = drugs.reduce((sum, d) => sum + getSellableRetailValue(d), 0);
   const estimatedInventoryMargin = inventoryRetailValue - inventoryCostValue;
-  const lowStockDrugs = drugs.filter((d) => d.stock_quantity <= d.low_stock_threshold);
-  const outOfStockDrugs = drugs.filter((d) => d.stock_quantity === 0);
+  const lowStockDrugs = drugs.filter((d) => getSellableStockQuantity(d) > 0 && getSellableStockQuantity(d) <= d.low_stock_threshold);
+  const outOfStockDrugs = drugs.filter((d) => !isExpiredDrug(d) && getSellableStockQuantity(d) === 0);
   const expiredDrugs = drugs.filter((d) => isExpiredDrug(d) && d.stock_quantity > 0);
   const expiringSoonDrugs = drugs.filter((d) => isExpiringSoonDrug(d) && d.stock_quantity > 0);
   const sellableDrugs = drugs.filter((d) => d.stock_quantity > 0 && !isExpiredDrug(d));
@@ -103,12 +115,12 @@ const Dashboard = () => {
     alertFilter === "expired" ? expiredDrugs :
     alertFilter === "expiring" ? expiringSoonDrugs.filter((d) => !isExpiredDrug(d)) :
     alertFilter === "out" ? outOfStockDrugs :
-    alertFilter === "low" ? lowStockDrugs.filter((d) => d.stock_quantity > 0) :
+    alertFilter === "low" ? lowStockDrugs :
     [
       ...expiredDrugs,
       ...expiringSoonDrugs.filter((d) => !isExpiredDrug(d)),
       ...outOfStockDrugs,
-      ...lowStockDrugs.filter((d) => d.stock_quantity > 0),
+      ...lowStockDrugs,
     ];
   const rangeLabel =
     salesPeriod === "daily" ? "Today" :
@@ -298,7 +310,7 @@ const Dashboard = () => {
           )}
         </div>
 
-        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+        <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-5">
           <Card className="animate-in fade-in-50 slide-in-from-bottom-2 duration-500 transition-transform hover:-translate-y-1 hover:shadow-lg">
             <CardHeader className="flex flex-row items-center justify-between pb-2">
               <CardTitle className="text-sm font-medium">Total Sales</CardTitle>
@@ -321,6 +333,16 @@ const Dashboard = () => {
               <p className="text-xs text-muted-foreground">Total sales minus the recorded buying cost of sold items</p>
             </CardContent>
           </Card>
+          <Card className="animate-in fade-in-50 slide-in-from-bottom-2 duration-500 delay-150 transition-transform hover:-translate-y-1 hover:shadow-lg">
+            <CardHeader className="flex flex-row items-center justify-between pb-2">
+              <CardTitle className="text-sm font-medium">Expired Stock Loss</CardTitle>
+              <AlertTriangle className="h-4 w-4 text-destructive" />
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold text-destructive">KSh {expiredStockCostLoss.toLocaleString()}</div>
+              <p className="text-xs text-muted-foreground">{expiredStockUnits} expired unit(s) deducted automatically</p>
+            </CardContent>
+          </Card>
           <Card className="animate-in fade-in-50 slide-in-from-bottom-2 duration-500 delay-200 transition-transform hover:-translate-y-1 hover:shadow-lg">
             <CardHeader className="flex flex-row items-center justify-between pb-2">
               <CardTitle className="text-sm font-medium">Bills Recorded</CardTitle>
@@ -338,7 +360,7 @@ const Dashboard = () => {
             </CardHeader>
             <CardContent>
               <div className="text-2xl font-bold">{totalItemsInStock}</div>
-              <p className="text-xs text-muted-foreground">Total units currently on hand</p>
+              <p className="text-xs text-muted-foreground">Usable units on hand after expired stock deduction</p>
             </CardContent>
           </Card>
         </div>
@@ -355,11 +377,13 @@ const Dashboard = () => {
           </Card>
           <Card className="animate-in fade-in-50 slide-in-from-bottom-2 duration-500 delay-200">
             <CardHeader className="pb-2">
-              <CardTitle className="text-sm font-medium">Cost Of Items Sold</CardTitle>
+              <CardTitle className="text-sm font-medium">Net Profit After Stock Loss</CardTitle>
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold">KSh {estimatedCostOfGoodsSold.toLocaleString()}</div>
-              <p className="text-xs text-muted-foreground">Recorded buying price at the time each sale was made</p>
+              <div className={`text-2xl font-bold ${netProfitAfterExpiredLoss >= 0 ? "text-green-600" : "text-red-600"}`}>
+                KSh {netProfitAfterExpiredLoss.toLocaleString()}
+              </div>
+              <p className="text-xs text-muted-foreground">Profit made minus expired stock buying-cost loss</p>
             </CardContent>
           </Card>
         </div>
@@ -443,7 +467,7 @@ const Dashboard = () => {
             </CardHeader>
             <CardContent>
               <div className="text-2xl font-bold">KSh {inventoryCostValue.toLocaleString()}</div>
-              <p className="text-xs text-muted-foreground">Buying price x stock left</p>
+              <p className="text-xs text-muted-foreground">Buying price x usable stock left, excluding expired items</p>
             </CardContent>
           </Card>
           <Card className="animate-in fade-in-50 slide-in-from-bottom-2 duration-500 delay-100">
@@ -452,7 +476,7 @@ const Dashboard = () => {
             </CardHeader>
             <CardContent>
               <div className="text-2xl font-bold">KSh {inventoryRetailValue.toLocaleString()}</div>
-              <p className="text-xs text-muted-foreground">Selling price x stock left</p>
+              <p className="text-xs text-muted-foreground">Selling price x usable stock left, excluding expired items</p>
             </CardContent>
           </Card>
           <Card className="animate-in fade-in-50 slide-in-from-bottom-2 duration-500 delay-200">
@@ -489,7 +513,7 @@ const Dashboard = () => {
             <div className="rounded-md border p-3 transition-colors hover:bg-accent/40">
               <p className="font-medium">Inventory values</p>
               <p className="text-sm text-muted-foreground">
-                `Inventory Cost Value` and `Inventory Retail Value` are based on stock still remaining, not past spending.
+                `Inventory Cost Value` and `Inventory Retail Value` automatically exclude expired stock.
               </p>
             </div>
             <div className="rounded-md border p-3 transition-colors hover:bg-accent/40">
@@ -579,7 +603,7 @@ const Dashboard = () => {
                     <div>
                       <span className="font-medium">{drug.name}</span>
                       <p className="text-xs text-muted-foreground">
-                        Stock: {drug.stock_quantity} | Expiry: {drug.expiry_date ? formatClinicDate(drug.expiry_date) : "Not set"}
+                        Stock: {getSellableStockQuantity(drug)} usable / {drug.stock_quantity} physical | Expiry: {drug.expiry_date ? formatClinicDate(drug.expiry_date) : "Not set"}
                       </p>
                     </div>
                     {isExpiredDrug(drug) ? (

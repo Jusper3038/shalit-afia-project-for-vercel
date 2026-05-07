@@ -9,7 +9,7 @@ import { Badge } from "@/components/ui/badge";
 import { AlertTriangle, HeartPulse, Loader2, MessageCircle, PackageCheck, Send, Sparkles, TrendingUp } from "lucide-react";
 import type { Tables } from "@/integrations/supabase/types";
 import { getClinicDayKey, getClinicWeekStartKey, getMonthLabel, getTransactionSaleDay, getTransactionSaleMonth, getTransactionSaleYear } from "@/lib/reporting";
-import { getDaysUntilExpiry, isExpiredDrug, isExpiringSoonDrug } from "@/lib/inventory";
+import { getDaysUntilExpiry, getExpiredStockCostLoss, getSellableStockQuantity, isExpiredDrug, isExpiringSoonDrug } from "@/lib/inventory";
 
 const OLLAMA_MODEL = import.meta.env.VITE_OLLAMA_MODEL || "llama3.1:8b";
 const GEMINI_MODEL = import.meta.env.VITE_GEMINI_MODEL || "gemini-2.5-flash";
@@ -126,10 +126,12 @@ const ClinicAssistant = () => {
       .sort((a, b) => b[1].sales - a[1].sales)
       .slice(0, 3);
 
-    const lowStockItems = data.drugs.filter((drug) => drug.stock_quantity > 0 && drug.stock_quantity <= drug.low_stock_threshold);
-    const outOfStockItems = data.drugs.filter((drug) => drug.stock_quantity === 0);
+    const lowStockItems = data.drugs.filter((drug) => getSellableStockQuantity(drug) > 0 && getSellableStockQuantity(drug) <= drug.low_stock_threshold);
+    const outOfStockItems = data.drugs.filter((drug) => !isExpiredDrug(drug) && getSellableStockQuantity(drug) === 0);
     const expiringItems = data.drugs.filter((drug) => isExpiringSoonDrug(drug) && !isExpiredDrug(drug));
     const expiredItems = data.drugs.filter((drug) => isExpiredDrug(drug));
+    const expiredStockLoss = data.drugs.reduce((sum, drug) => sum + getExpiredStockCostLoss(drug), 0);
+    const usableStockUnits = data.drugs.reduce((sum, drug) => sum + getSellableStockQuantity(drug), 0);
     const completedPayments = data.payments.filter((payment) => payment.status === "completed");
     const todayPayments = completedPayments.filter((payment) => getClinicDayKey(payment.created_at) === todayKey);
 
@@ -144,10 +146,15 @@ const ClinicAssistant = () => {
       todayProfit: totalProfit(todayTransactions),
       weekProfit: totalProfit(weekTransactions),
       monthProfit: totalProfit(monthTransactions),
+      netTodayProfitAfterStockLoss: totalProfit(todayTransactions) - expiredStockLoss,
+      netWeekProfitAfterStockLoss: totalProfit(weekTransactions) - expiredStockLoss,
+      netMonthProfitAfterStockLoss: totalProfit(monthTransactions) - expiredStockLoss,
       lowStockItems,
       outOfStockItems,
       expiringItems,
       expiredItems,
+      expiredStockLoss,
+      usableStockUnits,
       topSellingItems,
       todayPayments: todayPayments.reduce((sum, payment) => sum + Number(payment.amount), 0),
       totalPatients: data.patients.length,
@@ -166,6 +173,8 @@ const ClinicAssistant = () => {
       `Total patients: ${analytics.totalPatients}`,
       `Low stock items: ${analytics.lowStockItems.length}`,
       `Out of stock items: ${analytics.outOfStockItems.length}`,
+      `Usable stock units after expired-stock deduction: ${analytics.usableStockUnits}`,
+      `Expired stock loss: ${formatCurrency(analytics.expiredStockLoss)}`,
       `Expiring soon items: ${analytics.expiringItems.length}`,
       `Expired items: ${analytics.expiredItems.length}`,
       analytics.topSellingItems.length > 0
@@ -207,7 +216,8 @@ const ClinicAssistant = () => {
     });
 
     if (!response.ok) {
-      throw new Error(`Gemini request failed with status ${response.status}`);
+      const data = (await response.json().catch(() => null)) as { error?: string } | null;
+      throw new Error(data?.error || `Gemini request failed with status ${response.status}`);
     }
 
     const data = (await response.json()) as { reply?: string };
@@ -253,6 +263,8 @@ const ClinicAssistant = () => {
       `Today's report for ${profile?.clinic_name || "your clinic"}:`,
       `Sales: ${formatCurrency(analytics.todaySales)} from ${analytics.todayTransactions.length} bill lines.`,
       `Profit: ${formatCurrency(analytics.todayProfit)}.`,
+      `Expired stock loss: ${formatCurrency(analytics.expiredStockLoss)}.`,
+      `Net profit after expired-stock loss: ${formatCurrency(analytics.netTodayProfitAfterStockLoss)}.`,
       `Completed payments today: ${formatCurrency(analytics.todayPayments)}.`,
       `Patients in the system: ${analytics.totalPatients}.`,
       analytics.topSellingItems.length > 0
@@ -269,6 +281,7 @@ const ClinicAssistant = () => {
 
     return [
       `Stock risk summary: ${analytics.outOfStockItems.length} out of stock, ${analytics.lowStockItems.length} low-stock, ${analytics.expiringItems.length} expiring soon, and ${analytics.expiredItems.length} expired item(s).`,
+      `Expired stock is automatically deducted from usable stock; current expired-stock loss is ${formatCurrency(analytics.expiredStockLoss)}.`,
       lowStock.length > 0 ? `Low stock to act on first: ${lowStock.join(", ")}.` : "No active low-stock warnings right now.",
       expiring.length > 0 ? `Items nearing expiry: ${expiring.join(", ")}.` : "No items are close to expiry right now.",
     ].join(" ");
@@ -320,6 +333,7 @@ const ClinicAssistant = () => {
   const buildProfitReport = () => {
     return [
       `Profit snapshot: today ${formatCurrency(analytics.todayProfit)}, this week ${formatCurrency(analytics.weekProfit)}, and this month ${formatCurrency(analytics.monthProfit)}.`,
+      `After expired-stock loss of ${formatCurrency(analytics.expiredStockLoss)}, net profit is today ${formatCurrency(analytics.netTodayProfitAfterStockLoss)}, this week ${formatCurrency(analytics.netWeekProfitAfterStockLoss)}, and this month ${formatCurrency(analytics.netMonthProfitAfterStockLoss)}.`,
       `Sales snapshot: today ${formatCurrency(analytics.todaySales)}, this week ${formatCurrency(analytics.weekSales)}, and this month ${formatCurrency(analytics.monthSales)}.`,
     ].join(" ");
   };
@@ -404,7 +418,8 @@ const ClinicAssistant = () => {
             message.id === assistantMessage.id ? { ...message, text: reply } : message,
           ),
         );
-      } catch {
+      } catch (error) {
+        const geminiError = error instanceof Error ? error.message : "Gemini request failed.";
         try {
           const reply = await callOllama(trimmed, nextMessages);
           setMessages((current) =>
@@ -415,7 +430,12 @@ const ClinicAssistant = () => {
         } catch {
           setMessages((current) =>
             current.map((message) =>
-              message.id === assistantMessage.id ? { ...message, text: answerPrompt(trimmed) } : message,
+              message.id === assistantMessage.id
+                ? {
+                    ...message,
+                    text: `${answerPrompt(trimmed)}\n\nGemini connection note: ${geminiError}`,
+                  }
+                : message,
             ),
           );
         }

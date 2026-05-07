@@ -1,6 +1,6 @@
 import { Suspense, lazy } from "react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { BrowserRouter, Route, Routes } from "react-router-dom";
+import { BrowserRouter, Navigate, Route, Routes } from "react-router-dom";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
@@ -10,6 +10,7 @@ import ProtectedRoute from "@/components/ProtectedRoute";
 const Index = lazy(() => import("./pages/Index"));
 const Login = lazy(() => import("./pages/Login"));
 const Register = lazy(() => import("./pages/Register"));
+const PharmacyPage = lazy(() => import("./pages/Pharmacy"));
 const Dashboard = lazy(() => import("./pages/Dashboard"));
 const DrugsPage = lazy(() => import("./pages/Drugs"));
 const PatientsPage = lazy(() => import("./pages/Patients"));
@@ -44,10 +45,15 @@ const App = () => (
               <Route path="/home" element={<Index keepLandingVisible />} />
               <Route path="/login" element={<Login />} />
               <Route path="/register" element={<Register />} />
-              <Route path="/dashboard" element={<ProtectedRoute allowedRoles={["admin"]} requireSensitiveVerification><Dashboard /></ProtectedRoute>} />
-              <Route path="/drugs" element={<ProtectedRoute allowedRoles={["admin"]}><DrugsPage /></ProtectedRoute>} />
-              <Route path="/patients" element={<ProtectedRoute><PatientsPage /></ProtectedRoute>} />
-              <Route path="/billing" element={<ProtectedRoute><BillingPage /></ProtectedRoute>} />
+              <Route path="/pharmacy" element={<ProtectedRoute><PharmacyPage /></ProtectedRoute>} />
+              <Route path="/pharmacy/dashboard" element={<ProtectedRoute allowedRoles={["admin"]} requireSensitiveVerification><Dashboard /></ProtectedRoute>} />
+              <Route path="/pharmacy/inventory" element={<ProtectedRoute allowedRoles={["admin"]}><DrugsPage /></ProtectedRoute>} />
+              <Route path="/pharmacy/patients" element={<ProtectedRoute><PatientsPage /></ProtectedRoute>} />
+              <Route path="/pharmacy/billing" element={<ProtectedRoute><BillingPage /></ProtectedRoute>} />
+              <Route path="/dashboard" element={<ProtectedRoute allowedRoles={["admin"]}><Navigate to="/pharmacy/dashboard" replace /></ProtectedRoute>} />
+              <Route path="/drugs" element={<ProtectedRoute allowedRoles={["admin"]}><Navigate to="/pharmacy/inventory" replace /></ProtectedRoute>} />
+              <Route path="/patients" element={<ProtectedRoute><Navigate to="/pharmacy/patients" replace /></ProtectedRoute>} />
+              <Route path="/billing" element={<ProtectedRoute><Navigate to="/pharmacy/billing" replace /></ProtectedRoute>} />
               <Route path="/payments" element={<ProtectedRoute allowedRoles={["admin"]} requireSensitiveVerification><PaymentsPage /></ProtectedRoute>} />
               <Route path="/audit-logs" element={<ProtectedRoute allowedRoles={["admin"]} requireSensitiveVerification><AuditLogsPage /></ProtectedRoute>} />
               <Route path="/users" element={<ProtectedRoute requirePlatformOwner><UsersPage /></ProtectedRoute>} />

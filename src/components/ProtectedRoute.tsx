@@ -19,7 +19,7 @@ type ProtectedRouteProps = {
 const ProtectedRoute = ({
   children,
   allowedRoles,
-  redirectTo = "/billing",
+  redirectTo = "/pharmacy/billing",
   requireSensitiveVerification = false,
   requirePlatformOwner = false,
 }: ProtectedRouteProps) => {
