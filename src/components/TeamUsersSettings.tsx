@@ -23,7 +23,6 @@ type ClinicInvite = {
   accepted_by: string | null;
   accepted_at: string | null;
   created_at: string;
-  expires_at: string;
 };
 
 const TeamUsersSettings = () => {
@@ -78,21 +77,11 @@ const TeamUsersSettings = () => {
     }
 
     setCreating(true);
-    let { data, error } = await supabase.rpc("create_clinic_user_invite", {
+    const { data, error } = await supabase.rpc("create_clinic_user_invite", {
       p_invited_email: invitedEmail,
       p_allowed_apps: selectedApps,
       p_invited_phone: normalizedPhone,
     });
-
-    if (error && /could not find.*function|function.*does not exist/i.test(error.message)) {
-      const fallbackResult = await supabase.rpc("create_clinic_user_invite", {
-        p_invited_email: invitedEmail,
-        p_allowed_apps: selectedApps,
-      });
-      data = fallbackResult.data;
-      error = fallbackResult.error;
-    }
-
     setCreating(false);
 
     if (error) {
@@ -158,7 +147,7 @@ const TeamUsersSettings = () => {
       return;
     }
 
-    toast.success("Invite revoked.");
+    toast.success(invite.status === "accepted" ? "User access removed." : "Invite revoked.");
     void fetchInvites();
   };
 
@@ -237,7 +226,7 @@ const TeamUsersSettings = () => {
                   <TableHead>Code</TableHead>
                   <TableHead>Status</TableHead>
                   <TableHead>Allowed Apps</TableHead>
-                  <TableHead>Expires</TableHead>
+                  <TableHead>Access</TableHead>
                   <TableHead className="text-right">Actions</TableHead>
                 </TableRow>
               </TableHeader>
@@ -269,16 +258,16 @@ const TeamUsersSettings = () => {
                         ))}
                       </div>
                     </TableCell>
-                    <TableCell>{new Date(invite.expires_at).toLocaleDateString()}</TableCell>
+                    <TableCell>No expiry</TableCell>
                     <TableCell className="text-right">
                       <div className="flex justify-end gap-2">
                         <Button type="button" variant="outline" size="sm" onClick={() => handleCopyInvite(invite)} disabled={invite.status !== "pending"}>
                           <Copy className="mr-2 h-4 w-4" />
                           Copy
                         </Button>
-                        <Button type="button" variant="ghost" size="sm" onClick={() => handleRevoke(invite)} disabled={invite.status !== "pending" || revokingId === invite.id}>
+                        <Button type="button" variant="ghost" size="sm" onClick={() => handleRevoke(invite)} disabled={invite.status === "revoked" || revokingId === invite.id}>
                           <XCircle className="mr-2 h-4 w-4" />
-                          {revokingId === invite.id ? "Revoking..." : "Revoke"}
+                          {revokingId === invite.id ? "Removing..." : invite.status === "accepted" ? "Remove Access" : "Revoke"}
                         </Button>
                       </div>
                     </TableCell>
