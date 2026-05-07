@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
@@ -8,7 +8,23 @@ import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { toast } from "sonner";
 import { Heart, Home } from "lucide-react";
-import PhoneNumberInput, { normalizePhoneNumber } from "@/components/PhoneNumberInput";
+import PhoneNumberInput, { COUNTRY_CODES, normalizePhoneNumber } from "@/components/PhoneNumberInput";
+
+type InvitePreview = {
+  invite_code: string;
+  invited_email: string;
+  invited_phone: string;
+  clinic_name: string;
+  status: string;
+};
+
+const splitPhoneNumber = (value: string) => {
+  const country = COUNTRY_CODES.find((item) => value.startsWith(item.code)) ?? COUNTRY_CODES[0];
+  return {
+    countryCode: country.code,
+    phoneNumber: value.startsWith(country.code) ? value.slice(country.code.length) : value,
+  };
+};
 
 const Register = () => {
   const [name, setName] = useState("");
@@ -21,6 +37,44 @@ const Register = () => {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const inviteCode = searchParams.get("invite")?.trim().toUpperCase() ?? "";
+  const [invitePreview, setInvitePreview] = useState<InvitePreview | null>(null);
+  const [checkingInvite, setCheckingInvite] = useState(Boolean(inviteCode));
+
+  useEffect(() => {
+    const loadInvite = async () => {
+      if (!inviteCode) {
+        setCheckingInvite(false);
+        return;
+      }
+
+      setCheckingInvite(true);
+      const { data, error } = await supabase.rpc("get_clinic_invite_preview", {
+        p_invite_code: inviteCode,
+      });
+      setCheckingInvite(false);
+
+      if (error) {
+        toast.error(error.message);
+        return;
+      }
+
+      const preview = Array.isArray(data) ? data[0] : null;
+      if (!preview) {
+        toast.error("This invite link is not valid. Ask the clinic owner for a new link.");
+        return;
+      }
+
+      setInvitePreview(preview as InvitePreview);
+      setEmail(preview.invited_email ?? "");
+      if (preview.invited_phone) {
+        const nextPhone = splitPhoneNumber(preview.invited_phone);
+        setCountryCode(nextPhone.countryCode);
+        setPhoneNumber(nextPhone.phoneNumber);
+      }
+    };
+
+    void loadInvite();
+  }, [inviteCode]);
 
   const handleRegister = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -40,6 +94,23 @@ const Register = () => {
       return;
     }
 
+    if (inviteCode) {
+      if (!invitePreview) {
+        toast.error("This invite could not be verified. Ask the clinic owner to copy the invite link again.");
+        return;
+      }
+
+      if (invitePreview.status !== "pending") {
+        toast.error(invitePreview.status === "accepted" ? "This invite has already been accepted. Sign in instead." : "This invite was revoked by the clinic owner.");
+        return;
+      }
+
+      if (normalizedEmail !== invitePreview.invited_email.toLowerCase()) {
+        toast.error(`This invite is for ${invitePreview.invited_email}. Use that email to accept it.`);
+        return;
+      }
+    }
+
     setLoading(true);
     const { data, error } = await supabase.auth.signUp({
       email: normalizedEmail,
@@ -57,11 +128,11 @@ const Register = () => {
       toast.error("An account with this email already exists. Please sign in instead.");
       navigate("/login");
     } else if (data.session) {
-      toast.success("Account created successfully!");
+      toast.success(inviteCode ? "Invite accepted. You are signed in." : "Account created successfully!");
       navigate("/");
     } else {
-      toast.success("Account created! Check your email to confirm, or log in.");
-      navigate("/login");
+      toast.success(inviteCode ? "Invite accepted. Check your email to confirm, then log in." : "Account created! Check your email to confirm, or log in.");
+      navigate(`/login?email=${encodeURIComponent(normalizedEmail)}${inviteCode ? "&invite=accepted" : ""}`);
     }
   };
 
@@ -78,9 +149,13 @@ const Register = () => {
           <div className="mx-auto mb-2 flex h-12 w-12 items-center justify-center rounded-full bg-primary">
             <Heart className="h-6 w-6 text-primary-foreground" />
           </div>
-          <CardTitle className="text-2xl font-bold">Create Account</CardTitle>
+          <CardTitle className="text-2xl font-bold">{inviteCode ? "Accept Invite" : "Create Account"}</CardTitle>
           <CardDescription>
-            {inviteCode ? "Join your clinic team on SHALIT AFIA" : "Register your clinic on SHALIT AFIA"}
+            {inviteCode
+              ? invitePreview?.clinic_name
+                ? `Join ${invitePreview.clinic_name} on SHALIT AFIA`
+                : "Join your clinic team on SHALIT AFIA"
+              : "Register your clinic on SHALIT AFIA"}
           </CardDescription>
         </CardHeader>
         <CardContent>
@@ -90,8 +165,17 @@ const Register = () => {
               <Input id="name" placeholder="Dr. John" value={name} onChange={(e) => setName(e.target.value)} required />
             </div>
             {inviteCode ? (
-              <div className="rounded-md border bg-accent/40 px-3 py-2 text-sm">
-                <span className="font-medium">Invite Code:</span> {inviteCode}
+              <div className="space-y-2 rounded-md border bg-accent/40 px-3 py-2 text-sm">
+                <div><span className="font-medium">Invite Code:</span> {inviteCode}</div>
+                {checkingInvite ? (
+                  <div className="text-muted-foreground">Checking invite...</div>
+                ) : invitePreview?.status === "pending" ? (
+                  <div className="text-muted-foreground">Create your password here. After that, sign in normally with this email and password.</div>
+                ) : invitePreview ? (
+                  <div className="text-destructive">{invitePreview.status === "accepted" ? "This invite has already been accepted." : "This invite is no longer active."}</div>
+                ) : (
+                  <div className="text-destructive">This invite could not be verified.</div>
+                )}
               </div>
             ) : (
               <div className="space-y-2">
@@ -101,7 +185,7 @@ const Register = () => {
             )}
             <div className="space-y-2">
               <Label htmlFor="email">Email</Label>
-              <Input id="email" type="email" placeholder="clinic@example.com" value={email} onChange={(e) => setEmail(e.target.value)} required />
+              <Input id="email" type="email" placeholder="clinic@example.com" value={email} onChange={(e) => setEmail(e.target.value)} readOnly={Boolean(invitePreview?.invited_email)} required />
             </div>
             <div className="space-y-2">
               <Label htmlFor="phone">Phone Number</Label>
@@ -118,8 +202,8 @@ const Register = () => {
               <Label htmlFor="password">Password</Label>
               <PasswordInput id="password" placeholder="********" value={password} onChange={(e) => setPassword(e.target.value)} required minLength={6} />
             </div>
-            <Button type="submit" className="w-full" disabled={loading}>
-              {loading ? "Creating account..." : "Register"}
+            <Button type="submit" className="w-full" disabled={loading || checkingInvite || (Boolean(inviteCode) && invitePreview?.status !== "pending")}>
+              {loading ? "Creating account..." : inviteCode ? "Accept Invite" : "Register"}
             </Button>
           </form>
           <div className="mt-4 text-center text-sm text-muted-foreground">

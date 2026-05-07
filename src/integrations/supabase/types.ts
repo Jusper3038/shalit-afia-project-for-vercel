@@ -128,7 +128,7 @@ export type Database = {
           accepted_by: string | null
           allowed_apps: string[]
           created_at: string
-          expires_at: string
+          expires_at: string | null
           id: string
           invite_code: string
           invited_email: string
@@ -141,7 +141,7 @@ export type Database = {
           accepted_by?: string | null
           allowed_apps?: string[]
           created_at?: string
-          expires_at?: string
+          expires_at?: string | null
           id?: string
           invite_code: string
           invited_email: string
@@ -154,7 +154,7 @@ export type Database = {
           accepted_by?: string | null
           allowed_apps?: string[]
           created_at?: string
-          expires_at?: string
+          expires_at?: string | null
           id?: string
           invite_code?: string
           invited_email?: string
@@ -447,6 +447,18 @@ export type Database = {
       get_clinic_user_invites: {
         Args: Record<PropertyKey, never>
         Returns: Database["public"]["Tables"]["clinic_user_invites"]["Row"][]
+      }
+      get_clinic_invite_preview: {
+        Args: {
+          p_invite_code: string
+        }
+        Returns: {
+          clinic_name: string
+          invite_code: string
+          invited_email: string
+          invited_phone: string
+          status: string
+        }[]
       }
       revoke_clinic_user_invite: {
         Args: {

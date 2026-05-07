@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { Link, useNavigate } from "react-router-dom";
+import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -10,7 +10,8 @@ import { toast } from "sonner";
 import { Heart, Home } from "lucide-react";
 
 const Login = () => {
-  const [email, setEmail] = useState("");
+  const [searchParams] = useSearchParams();
+  const [email, setEmail] = useState(searchParams.get("email") ?? "");
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
   const navigate = useNavigate();
@@ -20,6 +21,10 @@ const Login = () => {
     if (blockedMessage) {
       toast.error(blockedMessage);
       sessionStorage.removeItem("auth_blocked_message");
+    }
+
+    if (searchParams.get("invite") === "accepted") {
+      toast.success("Invite accepted. Sign in with the password you created.");
     }
   }, []);
 

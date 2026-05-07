@@ -6,6 +6,22 @@ import { ALL_APP_PERMISSIONS, type AppPermission } from "@/lib/app-permissions";
 
 const SENSITIVE_ACCESS_KEY = "sensitive_access_verified_at";
 const SENSITIVE_ACCESS_WINDOW_MS = 15 * 60 * 1000;
+const REQUEST_TIMEOUT_MS = 8000;
+
+const withTimeout = async <T,>(promise: Promise<T>, fallback: T): Promise<T> => {
+  let timeoutId: number | undefined;
+  const timeout = new Promise<T>((resolve) => {
+    timeoutId = window.setTimeout(() => resolve(fallback), REQUEST_TIMEOUT_MS);
+  });
+
+  try {
+    return await Promise.race([promise, timeout]);
+  } catch {
+    return fallback;
+  } finally {
+    if (timeoutId) window.clearTimeout(timeoutId);
+  }
+};
 
 interface AuthContextType {
   session: Session | null;
@@ -64,15 +80,18 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const [loading, setLoading] = useState(true);
 
   const fetchProfile = async (userId: string) => {
-    const { data } = await supabase
-      .from("profiles")
-      .select("*")
-      .eq("user_id", userId)
-      .single();
+    const { data } = await withTimeout(
+      supabase
+        .from("profiles")
+        .select("*")
+        .eq("user_id", userId)
+        .single(),
+      { data: null, error: null }
+    );
 
     if (data && !data.is_active) {
       sessionStorage.setItem("auth_blocked_message", "This account has been deactivated. Contact the system owner.");
-      await supabase.auth.signOut();
+      void supabase.auth.signOut();
       setSession(null);
       setUser(null);
       setProfile(null);
@@ -91,16 +110,22 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   };
 
   const fetchRole = async (userId: string) => {
-    const { data } = await supabase
-      .from("user_roles")
-      .select("role")
-      .eq("user_id", userId)
-      .single();
+    const { data } = await withTimeout(
+      supabase
+        .from("user_roles")
+        .select("role")
+        .eq("user_id", userId)
+        .single(),
+      { data: null, error: null }
+    );
     setRole(data?.role ?? null);
   };
 
   const fetchOwnerSecurityPinStatus = async () => {
-    const { data, error } = await supabase.rpc("has_owner_security_pin");
+    const { data, error } = await withTimeout(
+      supabase.rpc("has_owner_security_pin"),
+      { data: false, error: null }
+    );
     if (!error) {
       setHasOwnerSecurityPin(Boolean(data));
     }
@@ -108,9 +133,12 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
   const fetchPlatformOwnerStatus = async (userId: string) => {
     setIsPlatformOwnerReady(false);
-    const { data, error } = await supabase.rpc("is_platform_owner", {
-      _user_id: userId,
-    });
+    const { data, error } = await withTimeout(
+      supabase.rpc("is_platform_owner", {
+        _user_id: userId,
+      }),
+      { data: false, error: null }
+    );
 
     if (!error) {
       setIsPlatformOwner(Boolean(data));
@@ -120,42 +148,37 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   };
 
   useEffect(() => {
+    const loadSessionContext = (session: Session | null) => {
+      setSession(session);
+      setUser(session?.user ?? null);
+      if (session?.user) {
+        void Promise.allSettled([
+          fetchProfile(session.user.id),
+          fetchRole(session.user.id),
+          fetchPlatformOwnerStatus(session.user.id),
+          fetchOwnerSecurityPinStatus(),
+        ]).finally(() => setLoading(false));
+      } else {
+        setProfile(null);
+        setRole(null);
+        setClinicOwnerId(null);
+        setAllowedApps([]);
+        setIsPlatformOwner(false);
+        setIsPlatformOwnerReady(false);
+        setHasOwnerSecurityPin(false);
+        setLoading(false);
+      }
+    };
+
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       async (_event, session) => {
-        setSession(session);
-        setUser(session?.user ?? null);
-        if (session?.user) {
-          setTimeout(() => {
-            fetchProfile(session.user.id);
-            fetchRole(session.user.id);
-            fetchPlatformOwnerStatus(session.user.id);
-            fetchOwnerSecurityPinStatus();
-          }, 0);
-        } else {
-          setProfile(null);
-          setRole(null);
-          setClinicOwnerId(null);
-          setAllowedApps([]);
-          setIsPlatformOwner(false);
-          setIsPlatformOwnerReady(false);
-          setHasOwnerSecurityPin(false);
-        }
-        setLoading(false);
+        setLoading(true);
+        setTimeout(() => loadSessionContext(session), 0);
       }
     );
 
     supabase.auth.getSession().then(({ data: { session } }) => {
-      setSession(session);
-      setUser(session?.user ?? null);
-      if (session?.user) {
-        fetchProfile(session.user.id);
-        fetchRole(session.user.id);
-        fetchPlatformOwnerStatus(session.user.id);
-        fetchOwnerSecurityPinStatus();
-      } else {
-        setIsPlatformOwnerReady(false);
-      }
-      setLoading(false);
+      loadSessionContext(session);
     });
 
     return () => subscription.unsubscribe();
