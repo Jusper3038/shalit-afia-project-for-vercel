@@ -153,13 +153,13 @@ const TeamUsersSettings = () => {
 
   return (
     <Card>
-      <CardHeader>
+      <CardHeader className="space-y-3">
         <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
-          <div>
+          <div className="min-w-0">
             <CardTitle>Team Users</CardTitle>
             <CardDescription>Add up to 2 users and choose which apps each user can access.</CardDescription>
           </div>
-          <Badge variant={activeInviteCount >= 2 ? "default" : "secondary"}>{activeInviteCount}/2 added</Badge>
+          <Badge className="w-fit" variant={activeInviteCount >= 2 ? "default" : "secondary"}>{activeInviteCount}/2 added</Badge>
         </div>
       </CardHeader>
       <CardContent className="space-y-6">
@@ -187,7 +187,7 @@ const TeamUsersSettings = () => {
               required
             />
           </div>
-          <Button type="submit" disabled={creating || activeInviteCount >= 2}>
+          <Button type="submit" className="w-full lg:w-auto" disabled={creating || activeInviteCount >= 2}>
             <Plus className="mr-2 h-4 w-4" />
             {creating ? "Creating..." : "Add User"}
           </Button>
@@ -198,8 +198,8 @@ const TeamUsersSettings = () => {
                 <label key={option.key} className="flex cursor-pointer items-start gap-3 rounded-md border p-3 transition-colors hover:bg-accent/50">
                   <Checkbox checked={selectedApps.includes(option.key)} onCheckedChange={() => toggleSelectedApp(option.key)} disabled={activeInviteCount >= 2} />
                   <span className="min-w-0">
-                    <span className="flex items-center gap-2 font-medium">
-                      <option.icon className="h-4 w-4 text-primary" />
+                    <span className="flex min-w-0 items-center gap-2 font-medium">
+                      <option.icon className="h-4 w-4 shrink-0 text-primary" />
                       {option.label}
                     </span>
                     <span className="mt-1 block text-xs text-muted-foreground">{option.description}</span>
@@ -210,15 +210,71 @@ const TeamUsersSettings = () => {
           </div>
         </form>
 
-        <div className="overflow-x-auto rounded-md border">
-          {loading ? (
-            <div className="flex h-32 items-center justify-center">
-              <div className="h-6 w-6 animate-spin rounded-full border-b-2 border-primary" />
+        {loading ? (
+          <div className="flex h-32 items-center justify-center rounded-md border">
+            <div className="h-6 w-6 animate-spin rounded-full border-b-2 border-primary" />
+          </div>
+        ) : invites.length === 0 ? (
+          <div className="rounded-md border p-6 text-center text-muted-foreground">No users added yet.</div>
+        ) : (
+          <>
+            <div className="grid gap-3 md:hidden">
+              {invites.map((invite) => (
+                <div key={invite.id} className="rounded-md border p-3">
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="min-w-0">
+                      <p className="truncate font-medium">{invite.invited_email}</p>
+                      <p className="mt-1 text-sm text-muted-foreground">{invite.invited_phone || "-"}</p>
+                    </div>
+                    <Badge className="shrink-0" variant={invite.status === "accepted" ? "default" : invite.status === "revoked" ? "destructive" : "secondary"}>
+                      {invite.status}
+                    </Badge>
+                  </div>
+
+                  <div className="mt-3 grid grid-cols-2 gap-2 text-sm">
+                    <div>
+                      <p className="text-xs text-muted-foreground">Code</p>
+                      <p className="font-medium">{invite.invite_code}</p>
+                    </div>
+                    <div>
+                      <p className="text-xs text-muted-foreground">Access</p>
+                      <p className="font-medium">No expiry</p>
+                    </div>
+                  </div>
+
+                  <div className="mt-4 space-y-2">
+                    <p className="text-xs font-medium text-muted-foreground">Allowed Apps</p>
+                    <div className="grid gap-2">
+                      {APP_PERMISSION_OPTIONS.map((option) => (
+                        <label key={`${invite.id}-${option.key}-mobile`} className="flex min-h-9 items-center gap-2 rounded-md border px-2 text-sm">
+                          <Checkbox
+                            checked={invite.allowed_apps.includes(option.key)}
+                            disabled={invite.status === "revoked" || savingAccessId === invite.id || (invite.status === "accepted" && !invite.accepted_by)}
+                            onCheckedChange={() => void toggleInviteApp(invite, option.key)}
+                          />
+                          <option.icon className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
+                          <span className="truncate">{option.label}</span>
+                        </label>
+                      ))}
+                    </div>
+                  </div>
+
+                  <div className="mt-4 grid gap-2 sm:grid-cols-2">
+                    <Button type="button" variant="outline" size="sm" onClick={() => handleCopyInvite(invite)} disabled={invite.status !== "pending"}>
+                      <Copy className="mr-2 h-4 w-4" />
+                      Copy
+                    </Button>
+                    <Button type="button" variant="ghost" size="sm" onClick={() => handleRevoke(invite)} disabled={invite.status === "revoked" || revokingId === invite.id}>
+                      <XCircle className="mr-2 h-4 w-4" />
+                      {revokingId === invite.id ? "Removing..." : invite.status === "accepted" ? "Remove Access" : "Revoke"}
+                    </Button>
+                  </div>
+                </div>
+              ))}
             </div>
-          ) : invites.length === 0 ? (
-            <div className="p-6 text-center text-muted-foreground">No users added yet.</div>
-          ) : (
-            <Table className="min-w-[980px]">
+
+            <div className="hidden overflow-x-auto rounded-md border md:block">
+              <Table className="min-w-[980px]">
               <TableHeader>
                 <TableRow>
                   <TableHead>Email</TableHead>
@@ -274,9 +330,10 @@ const TeamUsersSettings = () => {
                   </TableRow>
                 ))}
               </TableBody>
-            </Table>
-          )}
-        </div>
+              </Table>
+            </div>
+          </>
+        )}
       </CardContent>
     </Card>
   );

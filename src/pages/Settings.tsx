@@ -172,10 +172,10 @@ const SettingsPage = () => {
 
   return (
     <AppLayout>
-      <div className="space-y-6">
+      <div className="mx-auto w-full max-w-6xl space-y-5 sm:space-y-6">
         <div className="space-y-2">
-          <h2 className="text-2xl font-bold">Settings</h2>
-          <p className="text-sm text-muted-foreground">
+          <h2 className="text-xl font-bold sm:text-2xl">Settings</h2>
+          <p className="max-w-3xl text-sm text-muted-foreground">
             Locked admin controls for owner security and the global discount guardrail that applies across all inventory items.
           </p>
         </div>
@@ -190,7 +190,7 @@ const SettingsPage = () => {
                 </CardDescription>
               </CardHeader>
               <CardContent>
-                <form onSubmit={saveProfileSettings} className="grid gap-4 lg:grid-cols-3 lg:items-end">
+                <form onSubmit={saveProfileSettings} className="grid gap-4 md:grid-cols-2 xl:grid-cols-3 xl:items-end">
                   <div className="space-y-2">
                     <Label htmlFor="profile-owner-name">Owner Name</Label>
                     <Input
@@ -233,7 +233,7 @@ const SettingsPage = () => {
                       required
                     />
                   </div>
-                  <Button type="submit" className="lg:w-fit" disabled={savingProfile}>
+                  <Button type="submit" className="w-full md:w-fit" disabled={savingProfile}>
                     {savingProfile ? "Saving..." : "Save Profile"}
                   </Button>
                 </form>
@@ -265,7 +265,7 @@ const SettingsPage = () => {
                 <p className="text-sm text-muted-foreground">
                   The lead inbox lives in `Platform Accounts`, so only the creator sees new homepage inquiries there.
                 </p>
-                <Button type="button" onClick={handleClaimPlatformOwner} disabled={claimingPlatformOwner}>
+                <Button type="button" className="w-full sm:w-fit" onClick={handleClaimPlatformOwner} disabled={claimingPlatformOwner}>
                   {claimingPlatformOwner ? "Claiming..." : "Claim Platform Owner Access"}
                 </Button>
               </CardContent>
@@ -322,7 +322,7 @@ const SettingsPage = () => {
                     required
                   />
                 </div>
-                <Button type="submit" disabled={savingPin || pinMismatch || (hasOwnerSecurityPin && currentPin.length < 4)}>
+                <Button type="submit" className="w-full sm:w-fit" disabled={savingPin || pinMismatch || (hasOwnerSecurityPin && currentPin.length < 4)}>
                   {savingPin ? "Saving..." : hasOwnerSecurityPin ? "Update PIN" : "Create PIN"}
                 </Button>
               </form>
@@ -340,7 +340,7 @@ const SettingsPage = () => {
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
-              <div className="rounded-xl border bg-accent/20 p-4 text-sm text-muted-foreground">
+              <div className="rounded-md border bg-accent/20 p-3 text-sm text-muted-foreground sm:p-4">
                 The system uses exactly the percentage the admin saves here. New or unset guardrails stay at <span className="font-medium text-foreground">0%</span> until the admin chooses a value.
               </div>
               <div className="space-y-2">
@@ -353,10 +353,10 @@ const SettingsPage = () => {
                   step="1"
                   value={maximumDiscountPercentage}
                   onChange={(e) => setMaximumDiscountPercentage(e.target.value)}
-                  className="max-w-xs"
+                  className="w-full sm:max-w-xs"
                 />
               </div>
-              <Button type="button" onClick={saveDiscountSettings} disabled={savingGuardrail}>
+              <Button type="button" className="w-full sm:w-fit" onClick={saveDiscountSettings} disabled={savingGuardrail}>
                 {savingGuardrail ? "Saving..." : "Save Guardrail"}
               </Button>
             </CardContent>
