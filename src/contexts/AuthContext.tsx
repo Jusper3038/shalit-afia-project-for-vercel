@@ -2,6 +2,7 @@ import { createContext, useContext, useEffect, useState, ReactNode } from "react
 import { Session, User } from "@supabase/supabase-js";
 import { supabase } from "@/integrations/supabase/client";
 import type { Tables } from "@/integrations/supabase/types";
+import { ALL_APP_PERMISSIONS, type AppPermission } from "@/lib/app-permissions";
 
 const SENSITIVE_ACCESS_KEY = "sensitive_access_verified_at";
 const SENSITIVE_ACCESS_WINDOW_MS = 15 * 60 * 1000;
@@ -11,6 +12,9 @@ interface AuthContextType {
   user: User | null;
   profile: Tables<"profiles"> | null;
   role: string | null;
+  clinicOwnerId: string | null;
+  allowedApps: AppPermission[];
+  canAccessApp: (permission: AppPermission) => boolean;
   isPlatformOwner: boolean;
   isPlatformOwnerReady: boolean;
   loading: boolean;
@@ -29,6 +33,9 @@ const AuthContext = createContext<AuthContextType>({
   user: null,
   profile: null,
   role: null,
+  clinicOwnerId: null,
+  allowedApps: [],
+  canAccessApp: () => false,
   isPlatformOwner: false,
   isPlatformOwnerReady: false,
   loading: true,
@@ -49,6 +56,8 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const [user, setUser] = useState<User | null>(null);
   const [profile, setProfile] = useState<Tables<"profiles"> | null>(null);
   const [role, setRole] = useState<string | null>(null);
+  const [clinicOwnerId, setClinicOwnerId] = useState<string | null>(null);
+  const [allowedApps, setAllowedApps] = useState<AppPermission[]>([]);
   const [isPlatformOwner, setIsPlatformOwner] = useState(false);
   const [isPlatformOwnerReady, setIsPlatformOwnerReady] = useState(false);
   const [hasOwnerSecurityPin, setHasOwnerSecurityPin] = useState(false);
@@ -68,6 +77,8 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       setUser(null);
       setProfile(null);
       setRole(null);
+      setClinicOwnerId(null);
+      setAllowedApps([]);
       setIsPlatformOwner(false);
       setIsPlatformOwnerReady(false);
       setHasOwnerSecurityPin(false);
@@ -75,6 +86,8 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     }
 
     setProfile(data);
+    setClinicOwnerId(data?.owner_user_id ?? userId);
+    setAllowedApps((data?.allowed_apps as AppPermission[] | null) ?? ALL_APP_PERMISSIONS);
   };
 
   const fetchRole = async (userId: string) => {
@@ -121,6 +134,8 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         } else {
           setProfile(null);
           setRole(null);
+          setClinicOwnerId(null);
+          setAllowedApps([]);
           setIsPlatformOwner(false);
           setIsPlatformOwnerReady(false);
           setHasOwnerSecurityPin(false);
@@ -221,6 +236,8 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     setUser(null);
     setProfile(null);
     setRole(null);
+    setClinicOwnerId(null);
+    setAllowedApps([]);
     setIsPlatformOwner(false);
     setIsPlatformOwnerReady(false);
     setHasOwnerSecurityPin(false);
@@ -237,6 +254,11 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     return {};
   };
 
+  const canAccessApp = (permission: AppPermission) => {
+    if (role === "admin") return true;
+    return allowedApps.includes(permission);
+  };
+
   return (
     <AuthContext.Provider
       value={{
@@ -244,6 +266,9 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         user,
         profile,
         role,
+        clinicOwnerId,
+        allowedApps,
+        canAccessApp,
         isPlatformOwner,
         isPlatformOwnerReady,
         loading,

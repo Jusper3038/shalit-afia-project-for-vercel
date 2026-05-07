@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Link, useNavigate } from "react-router-dom";
+import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -8,23 +8,29 @@ import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { toast } from "sonner";
 import { Heart, Home } from "lucide-react";
+import PhoneNumberInput, { normalizePhoneNumber } from "@/components/PhoneNumberInput";
 
 const Register = () => {
   const [name, setName] = useState("");
   const [clinicName, setClinicName] = useState("");
   const [email, setEmail] = useState("");
+  const [countryCode, setCountryCode] = useState("+254");
+  const [phoneNumber, setPhoneNumber] = useState("");
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
+  const inviteCode = searchParams.get("invite")?.trim().toUpperCase() ?? "";
 
   const handleRegister = async (e: React.FormEvent) => {
     e.preventDefault();
     const trimmedName = name.trim();
     const trimmedClinicName = clinicName.trim();
     const normalizedEmail = email.trim().toLowerCase();
+    const normalizedPhone = normalizePhoneNumber(countryCode, phoneNumber);
     const trimmedPassword = password.trim();
 
-    if (!trimmedName || !trimmedClinicName || !normalizedEmail) {
+    if (!trimmedName || (!inviteCode && !trimmedClinicName) || !normalizedEmail || !normalizedPhone) {
       toast.error("Please fill in all required fields");
       return;
     }
@@ -39,7 +45,7 @@ const Register = () => {
       email: normalizedEmail,
       password: trimmedPassword,
       options: {
-        data: { name: trimmedName, clinic_name: trimmedClinicName },
+        data: { name: trimmedName, clinic_name: trimmedClinicName, invite_code: inviteCode, phone_number: normalizedPhone },
         emailRedirectTo: window.location.origin,
       },
     });
@@ -73,7 +79,9 @@ const Register = () => {
             <Heart className="h-6 w-6 text-primary-foreground" />
           </div>
           <CardTitle className="text-2xl font-bold">Create Account</CardTitle>
-          <CardDescription>Register your clinic on SHALIT AFIA</CardDescription>
+          <CardDescription>
+            {inviteCode ? "Join your clinic team on SHALIT AFIA" : "Register your clinic on SHALIT AFIA"}
+          </CardDescription>
         </CardHeader>
         <CardContent>
           <form onSubmit={handleRegister} className="space-y-4">
@@ -81,13 +89,30 @@ const Register = () => {
               <Label htmlFor="name">Your Name</Label>
               <Input id="name" placeholder="Dr. John" value={name} onChange={(e) => setName(e.target.value)} required />
             </div>
-            <div className="space-y-2">
-              <Label htmlFor="clinic">Clinic Name</Label>
-              <Input id="clinic" placeholder="My Clinic" value={clinicName} onChange={(e) => setClinicName(e.target.value)} required />
-            </div>
+            {inviteCode ? (
+              <div className="rounded-md border bg-accent/40 px-3 py-2 text-sm">
+                <span className="font-medium">Invite Code:</span> {inviteCode}
+              </div>
+            ) : (
+              <div className="space-y-2">
+                <Label htmlFor="clinic">Clinic Name</Label>
+                <Input id="clinic" placeholder="My Clinic" value={clinicName} onChange={(e) => setClinicName(e.target.value)} required />
+              </div>
+            )}
             <div className="space-y-2">
               <Label htmlFor="email">Email</Label>
               <Input id="email" type="email" placeholder="clinic@example.com" value={email} onChange={(e) => setEmail(e.target.value)} required />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="phone">Phone Number</Label>
+              <PhoneNumberInput
+                id="phone"
+                countryCode={countryCode}
+                phoneNumber={phoneNumber}
+                onCountryCodeChange={setCountryCode}
+                onPhoneNumberChange={setPhoneNumber}
+                required
+              />
             </div>
             <div className="space-y-2">
               <Label htmlFor="password">Password</Label>

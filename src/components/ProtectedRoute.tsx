@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Navigate } from "react-router-dom";
+import { Navigate, useNavigate } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
 import type { Enums } from "@/integrations/supabase/types";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button";
 import { PasswordInput } from "@/components/ui/password-input";
 import { Label } from "@/components/ui/label";
 import { toast } from "sonner";
+import type { AppPermission } from "@/lib/app-permissions";
 
 type ProtectedRouteProps = {
   children: React.ReactNode;
@@ -14,6 +15,7 @@ type ProtectedRouteProps = {
   redirectTo?: string;
   requireSensitiveVerification?: boolean;
   requirePlatformOwner?: boolean;
+  requiredApp?: AppPermission;
 };
 
 const ProtectedRoute = ({
@@ -22,6 +24,7 @@ const ProtectedRoute = ({
   redirectTo = "/pharmacy/billing",
   requireSensitiveVerification = false,
   requirePlatformOwner = false,
+  requiredApp,
 }: ProtectedRouteProps) => {
   const {
     session,
@@ -35,11 +38,14 @@ const ProtectedRoute = ({
     verifySensitiveAccess,
     setOwnerSecurityPin,
     resetOwnerSecurityPin,
+    canAccessApp,
+    allowedApps,
   } = useAuth();
   const [pin, setPin] = useState("");
   const [confirmPin, setConfirmPin] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const [sendingReset, setSendingReset] = useState(false);
+  const navigate = useNavigate();
 
   if (loading) {
     return (
@@ -67,6 +73,25 @@ const ProtectedRoute = ({
 
   if (requirePlatformOwner && !isPlatformOwner) {
     return <Navigate to={redirectTo} replace />;
+  }
+
+  if (requiredApp && !canAccessApp(requiredApp)) {
+    const fallbackByApp = {
+      dashboard: "/pharmacy/dashboard",
+      inventory: "/pharmacy/inventory",
+      patients: "/pharmacy/patients",
+      billing: "/pharmacy/billing",
+      payments: "/payments",
+      audit_logs: "/audit-logs",
+      settings: "/settings",
+    };
+    const fallbackPath = role === "admin"
+      ? redirectTo
+      : allowedApps.length > 0
+        ? fallbackByApp[allowedApps[0]]
+        : "/home";
+
+    return <Navigate to={fallbackPath} replace />;
   }
 
   const needsSensitiveVerification =
@@ -115,7 +140,11 @@ const ProtectedRoute = ({
 
   if (needsSensitiveVerification) {
     return (
-      <Dialog open>
+      <Dialog open onOpenChange={(open) => {
+        if (!open) {
+          navigate(redirectTo, { replace: true });
+        }
+      }}>
         <DialogContent className="sm:max-w-md" onPointerDownOutside={(e) => e.preventDefault()}>
           <DialogHeader>
             <DialogTitle>{hasOwnerSecurityPin ? "Enter Owner Security PIN" : "Create Owner Security PIN"}</DialogTitle>

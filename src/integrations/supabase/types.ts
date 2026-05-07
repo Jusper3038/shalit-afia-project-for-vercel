@@ -92,6 +92,7 @@ export type Database = {
           id: string
           notes: string | null
           page_path: string
+          phone_number: string
           source: string
           status: string
         }
@@ -103,6 +104,7 @@ export type Database = {
           id?: string
           notes?: string | null
           page_path?: string
+          phone_number?: string
           source?: string
           status?: string
         }
@@ -114,7 +116,50 @@ export type Database = {
           id?: string
           notes?: string | null
           page_path?: string
+          phone_number?: string
           source?: string
+          status?: string
+        }
+        Relationships: []
+      }
+      clinic_user_invites: {
+        Row: {
+          accepted_at: string | null
+          accepted_by: string | null
+          allowed_apps: string[]
+          created_at: string
+          expires_at: string
+          id: string
+          invite_code: string
+          invited_email: string
+          invited_phone: string
+          owner_user_id: string
+          status: string
+        }
+        Insert: {
+          accepted_at?: string | null
+          accepted_by?: string | null
+          allowed_apps?: string[]
+          created_at?: string
+          expires_at?: string
+          id?: string
+          invite_code: string
+          invited_email: string
+          invited_phone?: string
+          owner_user_id: string
+          status?: string
+        }
+        Update: {
+          accepted_at?: string | null
+          accepted_by?: string | null
+          allowed_apps?: string[]
+          created_at?: string
+          expires_at?: string
+          id?: string
+          invite_code?: string
+          invited_email?: string
+          invited_phone?: string
+          owner_user_id?: string
           status?: string
         }
         Relationships: []
@@ -190,6 +235,9 @@ export type Database = {
           is_active: boolean
           minimum_profit_retention_percentage: number
           name: string
+          owner_user_id: string
+          allowed_apps: string[]
+          phone_number: string
           updated_at: string
           user_id: string
         }
@@ -203,6 +251,9 @@ export type Database = {
           is_active?: boolean
           minimum_profit_retention_percentage?: number
           name?: string
+          owner_user_id?: string
+          allowed_apps?: string[]
+          phone_number?: string
           updated_at?: string
           user_id: string
         }
@@ -216,6 +267,9 @@ export type Database = {
           is_active?: boolean
           minimum_profit_retention_percentage?: number
           name?: string
+          owner_user_id?: string
+          allowed_apps?: string[]
+          phone_number?: string
           updated_at?: string
           user_id?: string
         }
@@ -371,6 +425,48 @@ export type Database = {
       can_claim_platform_owner: {
         Args: Record<PropertyKey, never>
         Returns: boolean
+      }
+      can_access_clinic_user: {
+        Args: {
+          _owner_user_id: string
+        }
+        Returns: boolean
+      }
+      current_clinic_owner_id: {
+        Args: Record<PropertyKey, never>
+        Returns: string
+      }
+      create_clinic_user_invite: {
+        Args: {
+          p_allowed_apps?: string[]
+          p_invited_email: string
+          p_invited_phone?: string
+        }
+        Returns: Database["public"]["Tables"]["clinic_user_invites"]["Row"]
+      }
+      get_clinic_user_invites: {
+        Args: Record<PropertyKey, never>
+        Returns: Database["public"]["Tables"]["clinic_user_invites"]["Row"][]
+      }
+      revoke_clinic_user_invite: {
+        Args: {
+          p_invite_id: string
+        }
+        Returns: undefined
+      }
+      update_clinic_invite_apps: {
+        Args: {
+          p_allowed_apps: string[]
+          p_invite_id: string
+        }
+        Returns: undefined
+      }
+      update_clinic_user_apps: {
+        Args: {
+          p_allowed_apps: string[]
+          p_target_user_id: string
+        }
+        Returns: undefined
       }
       verify_owner_security_pin: {
         Args: {

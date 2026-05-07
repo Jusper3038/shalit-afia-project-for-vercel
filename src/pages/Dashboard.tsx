@@ -41,7 +41,7 @@ import {
 type AlertFilter = "all" | "expired" | "expiring" | "out" | "low";
 
 const Dashboard = () => {
-  const { user } = useAuth();
+  const { clinicOwnerId } = useAuth();
   const [drugs, setDrugs] = useState<Tables<"drugs">[]>([]);
   const [patients, setPatients] = useState<Tables<"patients">[]>([]);
   const [transactions, setTransactions] = useState<Tables<"transactions">[]>([]);
@@ -59,12 +59,12 @@ const Dashboard = () => {
   const [customEndDate, setCustomEndDate] = useState(() => getClinicDayKey(new Date()));
 
   useEffect(() => {
-    if (!user) return;
+    if (!clinicOwnerId) return;
     const fetchData = async () => {
       const [drugsRes, patientsRes, txRes] = await Promise.all([
-        supabase.from("drugs").select("*").eq("user_id", user.id),
-        supabase.from("patients").select("*").eq("user_id", user.id),
-        supabase.from("transactions").select("*").eq("user_id", user.id),
+        supabase.from("drugs").select("*").eq("user_id", clinicOwnerId),
+        supabase.from("patients").select("*").eq("user_id", clinicOwnerId),
+        supabase.from("transactions").select("*").eq("user_id", clinicOwnerId),
       ]);
       setDrugs(drugsRes.data ?? []);
       setPatients(patientsRes.data ?? []);
@@ -72,7 +72,7 @@ const Dashboard = () => {
       setLoading(false);
     };
     fetchData();
-  }, [user]);
+  }, [clinicOwnerId]);
 
   useEffect(() => {
     const intervalId = window.setInterval(() => {

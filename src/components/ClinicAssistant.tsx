@@ -37,7 +37,7 @@ const quickPrompts = [
 const formatCurrency = (value: number) => `KSh ${value.toLocaleString()}`;
 
 const ClinicAssistant = () => {
-  const { user, profile } = useAuth();
+  const { user, profile, clinicOwnerId } = useAuth();
   const [open, setOpen] = useState(false);
   const [loading, setLoading] = useState(false);
   const [sending, setSending] = useState(false);
@@ -58,17 +58,17 @@ const ClinicAssistant = () => {
   const messagesEndRef = useRef<HTMLDivElement | null>(null);
 
   useEffect(() => {
-    if (!open || !user) return;
+    if (!open || !clinicOwnerId) return;
 
     let cancelled = false;
 
     const fetchData = async () => {
       setLoading(true);
       const [drugsRes, patientsRes, paymentsRes, transactionsRes] = await Promise.all([
-        supabase.from("drugs").select("*").eq("user_id", user.id),
-        supabase.from("patients").select("*").eq("user_id", user.id),
-        supabase.from("payments").select("*").eq("user_id", user.id),
-        supabase.from("transactions").select("*").eq("user_id", user.id),
+        supabase.from("drugs").select("*").eq("user_id", clinicOwnerId),
+        supabase.from("patients").select("*").eq("user_id", clinicOwnerId),
+        supabase.from("payments").select("*").eq("user_id", clinicOwnerId),
+        supabase.from("transactions").select("*").eq("user_id", clinicOwnerId),
       ]);
 
       if (cancelled) return;
@@ -87,7 +87,7 @@ const ClinicAssistant = () => {
     return () => {
       cancelled = true;
     };
-  }, [open, user]);
+  }, [open, clinicOwnerId]);
 
   useEffect(() => {
     if (!open) return;

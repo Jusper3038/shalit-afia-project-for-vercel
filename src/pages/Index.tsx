@@ -15,6 +15,7 @@ import { Button } from "@/components/ui/button";
 import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
+import PhoneNumberInput, { normalizePhoneNumber } from "@/components/PhoneNumberInput";
 
 const featuredNews = [
   "Meet the clinic that stopped chasing records and started focusing on people.",
@@ -67,6 +68,8 @@ const Index = ({ keepLandingVisible = false }: IndexProps) => {
   const [leadOpen, setLeadOpen] = useState(false);
   const [leadName, setLeadName] = useState("");
   const [leadEmail, setLeadEmail] = useState("");
+  const [leadCountryCode, setLeadCountryCode] = useState("+254");
+  const [leadPhone, setLeadPhone] = useState("");
   const [leadClinic, setLeadClinic] = useState("");
 
   useEffect(() => {
@@ -85,8 +88,9 @@ const Index = ({ keepLandingVisible = false }: IndexProps) => {
 
   const handleLeadSubmit = (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
-    if (!leadName.trim() || !leadEmail.trim() || !leadClinic.trim()) {
-      toast.error("Please fill in your name, email, and clinic.");
+    const normalizedPhone = normalizePhoneNumber(leadCountryCode, leadPhone);
+    if (!leadName.trim() || !leadEmail.trim() || !leadClinic.trim() || !normalizedPhone) {
+      toast.error("Please fill in your name, email, phone number, and clinic.");
       return;
     }
 
@@ -94,6 +98,7 @@ const Index = ({ keepLandingVisible = false }: IndexProps) => {
       const { error } = await supabase.from("leads").insert({
         full_name: leadName.trim(),
         email: leadEmail.trim().toLowerCase(),
+        phone_number: normalizedPhone,
         clinic_name: leadClinic.trim(),
         page_path: window.location.pathname,
         source: "homepage_popup",
@@ -108,6 +113,7 @@ const Index = ({ keepLandingVisible = false }: IndexProps) => {
       setLeadOpen(false);
       setLeadName("");
       setLeadEmail("");
+      setLeadPhone("");
       setLeadClinic("");
     };
 
@@ -354,6 +360,19 @@ const Index = ({ keepLandingVisible = false }: IndexProps) => {
                 onChange={(e) => setLeadEmail(e.target.value)}
                 placeholder="you@clinic.com"
                 className="bg-slate-700 border-white/10 text-white placeholder:text-white/40"
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="lead-phone" className="text-white">Phone Number</Label>
+              <PhoneNumberInput
+                id="lead-phone"
+                countryCode={leadCountryCode}
+                phoneNumber={leadPhone}
+                onCountryCodeChange={setLeadCountryCode}
+                onPhoneNumberChange={setLeadPhone}
+                selectClassName="bg-slate-700 border-white/10 text-white"
+                inputClassName="bg-slate-700 border-white/10 text-white placeholder:text-white/40"
+                required
               />
             </div>
             <div className="space-y-2">

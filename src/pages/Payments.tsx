@@ -11,23 +11,25 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { toast } from "sonner";
 import { Phone, RefreshCw } from "lucide-react";
 import type { Tables } from "@/integrations/supabase/types";
+import PhoneNumberInput, { normalizePhoneNumber } from "@/components/PhoneNumberInput";
 
 const getErrorMessage = (error: unknown) => error instanceof Error ? error.message : "Failed to initiate M-Pesa payment";
 
 const PaymentsPage = () => {
-  const { user } = useAuth();
+  const { user, clinicOwnerId } = useAuth();
   const [payments, setPayments] = useState<Tables<"payments">[]>([]);
   const [loading, setLoading] = useState(true);
+  const [countryCode, setCountryCode] = useState("+254");
   const [phone, setPhone] = useState("");
   const [amount, setAmount] = useState("");
   const [submitting, setSubmitting] = useState(false);
 
   const fetchPayments = async () => {
-    if (!user) return;
+    if (!clinicOwnerId) return;
     const { data } = await supabase
       .from("payments")
       .select("*")
-      .eq("user_id", user.id)
+      .eq("user_id", clinicOwnerId)
       .order("created_at", { ascending: false });
     setPayments(data ?? []);
     setLoading(false);
@@ -35,25 +37,26 @@ const PaymentsPage = () => {
 
   useEffect(() => {
     fetchPayments();
-  }, [user]);
+  }, [clinicOwnerId]);
 
   const handleMpesaPay = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!user) return;
+    if (!clinicOwnerId) return;
     const amt = parseFloat(amount);
-    if (!phone || isNaN(amt) || amt <= 0) {
+    const normalizedPhone = normalizePhoneNumber(countryCode, phone);
+    if (!normalizedPhone || isNaN(amt) || amt <= 0) {
       toast.error("Enter a valid phone number and amount");
       return;
     }
     setSubmitting(true);
     try {
       const { data, error } = await supabase.functions.invoke("mpesa-stk-push", {
-        body: { phone, amount: amt, user_id: user.id },
+        body: { phone: normalizedPhone, amount: amt, user_id: clinicOwnerId },
       });
       if (error) throw error;
       if (data?.ResponseCode === "0") {
         toast.success("STK Push sent! Check your phone to complete payment.");
-        await logAudit("M-Pesa STK Push", `KSh ${amt} to ${phone}`);
+        await logAudit("M-Pesa STK Push", `KSh ${amt} to ${normalizedPhone}`);
         setPhone("");
         setAmount("");
         // Refresh after a short delay to show pending payment
@@ -94,10 +97,12 @@ const PaymentsPage = () => {
             <form onSubmit={handleMpesaPay} className="space-y-4">
               <div>
                 <Label>Phone Number</Label>
-                <Input
-                  placeholder="e.g. 0712345678 or 254712345678"
-                  value={phone}
-                  onChange={(e) => setPhone(e.target.value)}
+                <PhoneNumberInput
+                  countryCode={countryCode}
+                  phoneNumber={phone}
+                  onCountryCodeChange={setCountryCode}
+                  onPhoneNumberChange={setPhone}
+                  placeholder="712345678"
                   required
                 />
               </div>

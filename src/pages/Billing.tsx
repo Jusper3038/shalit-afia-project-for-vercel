@@ -57,7 +57,7 @@ type TransactionGroup = {
 };
 
 const BillingPage = () => {
-  const { user, profile } = useAuth();
+  const { user, profile, clinicOwnerId } = useAuth();
   const [patients, setPatients] = useState<Tables<"patients">[]>([]);
   const [drugs, setDrugs] = useState<Tables<"drugs">[]>([]);
   const [transactions, setTransactions] = useState<Tables<"transactions">[]>([]);
@@ -76,11 +76,11 @@ const BillingPage = () => {
   );
 
   const fetchAll = async () => {
-    if (!user) return;
+    if (!clinicOwnerId) return;
     const [pRes, dRes, tRes] = await Promise.all([
-      supabase.from("patients").select("*").eq("user_id", user.id),
-      supabase.from("drugs").select("*").eq("user_id", user.id),
-      supabase.from("transactions").select("*").eq("user_id", user.id).order("date", { ascending: false }),
+      supabase.from("patients").select("*").eq("user_id", clinicOwnerId),
+      supabase.from("drugs").select("*").eq("user_id", clinicOwnerId),
+      supabase.from("transactions").select("*").eq("user_id", clinicOwnerId).order("date", { ascending: false }),
     ]);
     setPatients(pRes.data ?? []);
     setDrugs(dRes.data ?? []);
@@ -88,7 +88,7 @@ const BillingPage = () => {
     setLoading(false);
   };
 
-  useEffect(() => { fetchAll(); }, [user]);
+  useEffect(() => { fetchAll(); }, [clinicOwnerId]);
   useEffect(() => {
     setMaximumDiscountPercentage(String(profile?.minimum_profit_retention_percentage ?? 0));
   }, [profile?.minimum_profit_retention_percentage]);

@@ -1,5 +1,7 @@
 import { useEffect, useState } from "react";
 import AppLayout from "@/components/AppLayout";
+import PhoneNumberInput, { COUNTRY_CODES, normalizePhoneNumber } from "@/components/PhoneNumberInput";
+import TeamUsersSettings from "@/components/TeamUsersSettings";
 import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
 import { logAudit } from "@/lib/audit";
@@ -12,9 +14,24 @@ import { Label } from "@/components/ui/label";
 import { toast } from "sonner";
 import { Crown, LockKeyhole, ShieldCheck, Tags } from "lucide-react";
 
+const splitPhoneNumber = (value?: string | null) => {
+  const phone = value ?? "";
+  const country = COUNTRY_CODES.find((item) => phone.startsWith(item.code)) ?? COUNTRY_CODES[0];
+  return {
+    countryCode: country.code,
+    phoneNumber: phone.startsWith(country.code) ? phone.slice(country.code.length) : phone,
+  };
+};
+
 const SettingsPage = () => {
-  const { user, profile, hasOwnerSecurityPin, isPlatformOwner, claimPlatformOwnerAccess, setOwnerSecurityPin } = useAuth();
+  const { user, profile, role, hasOwnerSecurityPin, isPlatformOwner, claimPlatformOwnerAccess, setOwnerSecurityPin } = useAuth();
   const [canClaimPlatformOwner, setCanClaimPlatformOwner] = useState<boolean | null>(null);
+  const [profileName, setProfileName] = useState(profile?.name ?? "");
+  const [clinicName, setClinicName] = useState(profile?.clinic_name ?? "");
+  const [profileEmail, setProfileEmail] = useState(profile?.email ?? "");
+  const [profileCountryCode, setProfileCountryCode] = useState(splitPhoneNumber(profile?.phone_number).countryCode);
+  const [profilePhone, setProfilePhone] = useState(splitPhoneNumber(profile?.phone_number).phoneNumber);
+  const [savingProfile, setSavingProfile] = useState(false);
   const [currentPin, setCurrentPin] = useState("");
   const [newPin, setNewPin] = useState("");
   const [confirmPin, setConfirmPin] = useState("");
@@ -28,6 +45,15 @@ const SettingsPage = () => {
   useEffect(() => {
     setMaximumDiscountPercentage(String(profile?.minimum_profit_retention_percentage ?? 0));
   }, [profile?.minimum_profit_retention_percentage]);
+
+  useEffect(() => {
+    setProfileName(profile?.name ?? "");
+    setClinicName(profile?.clinic_name ?? "");
+    setProfileEmail(profile?.email ?? "");
+    const nextPhone = splitPhoneNumber(profile?.phone_number);
+    setProfileCountryCode(nextPhone.countryCode);
+    setProfilePhone(nextPhone.phoneNumber);
+  }, [profile?.name, profile?.clinic_name, profile?.email, profile?.phone_number]);
 
   useEffect(() => {
     const loadCanClaimPlatformOwner = async () => {
@@ -68,6 +94,41 @@ const SettingsPage = () => {
     setCurrentPin("");
     setNewPin("");
     setConfirmPin("");
+  };
+
+  const saveProfileSettings = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!user) return;
+
+    const trimmedName = profileName.trim();
+    const trimmedClinicName = clinicName.trim();
+    const normalizedEmail = profileEmail.trim().toLowerCase();
+    const normalizedPhone = normalizePhoneNumber(profileCountryCode, profilePhone);
+
+    if (!trimmedName || !trimmedClinicName || !normalizedEmail || !normalizedPhone) {
+      toast.error("Name, clinic name, email, and phone number are required.");
+      return;
+    }
+
+    setSavingProfile(true);
+    const { error } = await supabase
+      .from("profiles")
+      .update({
+        name: trimmedName,
+        clinic_name: trimmedClinicName,
+        email: normalizedEmail,
+        phone_number: normalizedPhone,
+      })
+      .eq("user_id", user.id);
+    setSavingProfile(false);
+
+    if (error) {
+      toast.error(error.message);
+      return;
+    }
+
+    await logAudit("Updated clinic profile", `Updated profile information for ${trimmedClinicName}.`);
+    toast.success("Clinic profile updated. Sign out and back in if the header does not refresh immediately.");
   };
 
   const saveDiscountSettings = async () => {
@@ -120,6 +181,72 @@ const SettingsPage = () => {
         </div>
 
         <div className="grid gap-6 xl:grid-cols-2">
+          {role === "admin" && (
+            <Card className="border-primary/20 xl:col-span-2">
+              <CardHeader>
+                <CardTitle>Clinic Profile</CardTitle>
+                <CardDescription>
+                  Update the clinic owner details shown across the system.
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <form onSubmit={saveProfileSettings} className="grid gap-4 lg:grid-cols-3 lg:items-end">
+                  <div className="space-y-2">
+                    <Label htmlFor="profile-owner-name">Owner Name</Label>
+                    <Input
+                      id="profile-owner-name"
+                      value={profileName}
+                      onChange={(e) => setProfileName(e.target.value)}
+                      placeholder="Owner name"
+                      required
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="profile-clinic-name">Clinic Name</Label>
+                    <Input
+                      id="profile-clinic-name"
+                      value={clinicName}
+                      onChange={(e) => setClinicName(e.target.value)}
+                      placeholder="Clinic name"
+                      required
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="profile-email">Profile Email</Label>
+                    <Input
+                      id="profile-email"
+                      type="email"
+                      value={profileEmail}
+                      onChange={(e) => setProfileEmail(e.target.value)}
+                      placeholder="owner@example.com"
+                      required
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="profile-phone">Phone Number</Label>
+                    <PhoneNumberInput
+                      id="profile-phone"
+                      countryCode={profileCountryCode}
+                      phoneNumber={profilePhone}
+                      onCountryCodeChange={setProfileCountryCode}
+                      onPhoneNumberChange={setProfilePhone}
+                      required
+                    />
+                  </div>
+                  <Button type="submit" className="lg:w-fit" disabled={savingProfile}>
+                    {savingProfile ? "Saving..." : "Save Profile"}
+                  </Button>
+                </form>
+              </CardContent>
+            </Card>
+          )}
+
+          {role === "admin" && (
+            <div className="xl:col-span-2">
+              <TeamUsersSettings />
+            </div>
+          )}
+
           {!isPlatformOwner && canClaimPlatformOwner === true && (
             <Card className="border-primary/20 xl:col-span-2">
               <CardHeader>

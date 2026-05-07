@@ -46,18 +46,19 @@ const App = () => (
               <Route path="/login" element={<Login />} />
               <Route path="/register" element={<Register />} />
               <Route path="/pharmacy" element={<ProtectedRoute><PharmacyPage /></ProtectedRoute>} />
-              <Route path="/pharmacy/dashboard" element={<ProtectedRoute allowedRoles={["admin"]} requireSensitiveVerification><Dashboard /></ProtectedRoute>} />
-              <Route path="/pharmacy/inventory" element={<ProtectedRoute allowedRoles={["admin"]}><DrugsPage /></ProtectedRoute>} />
-              <Route path="/pharmacy/patients" element={<ProtectedRoute><PatientsPage /></ProtectedRoute>} />
-              <Route path="/pharmacy/billing" element={<ProtectedRoute><BillingPage /></ProtectedRoute>} />
-              <Route path="/dashboard" element={<ProtectedRoute allowedRoles={["admin"]}><Navigate to="/pharmacy/dashboard" replace /></ProtectedRoute>} />
-              <Route path="/drugs" element={<ProtectedRoute allowedRoles={["admin"]}><Navigate to="/pharmacy/inventory" replace /></ProtectedRoute>} />
-              <Route path="/patients" element={<ProtectedRoute><Navigate to="/pharmacy/patients" replace /></ProtectedRoute>} />
-              <Route path="/billing" element={<ProtectedRoute><Navigate to="/pharmacy/billing" replace /></ProtectedRoute>} />
-              <Route path="/payments" element={<ProtectedRoute allowedRoles={["admin"]} requireSensitiveVerification><PaymentsPage /></ProtectedRoute>} />
-              <Route path="/audit-logs" element={<ProtectedRoute allowedRoles={["admin"]} requireSensitiveVerification><AuditLogsPage /></ProtectedRoute>} />
+              <Route path="/pharmacy/dashboard" element={<ProtectedRoute requiredApp="dashboard" requireSensitiveVerification><Dashboard /></ProtectedRoute>} />
+              <Route path="/pharmacy/inventory" element={<ProtectedRoute requiredApp="inventory"><DrugsPage /></ProtectedRoute>} />
+              <Route path="/pharmacy/patients" element={<ProtectedRoute requiredApp="patients"><PatientsPage /></ProtectedRoute>} />
+              <Route path="/pharmacy/billing" element={<ProtectedRoute requiredApp="billing"><BillingPage /></ProtectedRoute>} />
+              <Route path="/dashboard" element={<ProtectedRoute requiredApp="dashboard"><Navigate to="/pharmacy/dashboard" replace /></ProtectedRoute>} />
+              <Route path="/drugs" element={<ProtectedRoute requiredApp="inventory"><Navigate to="/pharmacy/inventory" replace /></ProtectedRoute>} />
+              <Route path="/patients" element={<ProtectedRoute requiredApp="patients"><Navigate to="/pharmacy/patients" replace /></ProtectedRoute>} />
+              <Route path="/billing" element={<ProtectedRoute requiredApp="billing"><Navigate to="/pharmacy/billing" replace /></ProtectedRoute>} />
+              <Route path="/payments" element={<ProtectedRoute requiredApp="payments" requireSensitiveVerification><PaymentsPage /></ProtectedRoute>} />
+              <Route path="/team" element={<ProtectedRoute requiredApp="settings"><Navigate to="/settings" replace /></ProtectedRoute>} />
+              <Route path="/audit-logs" element={<ProtectedRoute requiredApp="audit_logs" requireSensitiveVerification><AuditLogsPage /></ProtectedRoute>} />
               <Route path="/users" element={<ProtectedRoute requirePlatformOwner><UsersPage /></ProtectedRoute>} />
-              <Route path="/settings" element={<ProtectedRoute allowedRoles={["admin"]} requireSensitiveVerification><SettingsPage /></ProtectedRoute>} />
+              <Route path="/settings" element={<ProtectedRoute requiredApp="settings" requireSensitiveVerification><SettingsPage /></ProtectedRoute>} />
               <Route path="*" element={<NotFound />} />
             </Routes>
           </Suspense>

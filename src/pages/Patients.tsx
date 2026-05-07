@@ -14,30 +14,40 @@ import { Card, CardContent } from "@/components/ui/card";
 import { toast } from "sonner";
 import { Plus, Pencil, Trash2, Download } from "lucide-react";
 import type { Tables } from "@/integrations/supabase/types";
+import PhoneNumberInput, { COUNTRY_CODES, normalizePhoneNumber } from "@/components/PhoneNumberInput";
+
+const splitPhoneNumber = (value?: string | null) => {
+  const phone = value ?? "";
+  const country = COUNTRY_CODES.find((item) => phone.startsWith(item.code)) ?? COUNTRY_CODES[0];
+  return {
+    countryCode: country.code,
+    phoneNumber: phone.startsWith(country.code) ? phone.slice(country.code.length) : phone,
+  };
+};
 
 const PatientsPage = () => {
-  const { user } = useAuth();
+  const { clinicOwnerId } = useAuth();
   const [patients, setPatients] = useState<Tables<"patients">[]>([]);
   const [loading, setLoading] = useState(true);
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editing, setEditing] = useState<Tables<"patients"> | null>(null);
-  const [form, setForm] = useState({ name: "", phone: "", diagnosis: "" });
+  const [form, setForm] = useState({ name: "", phone: "", countryCode: "+254", diagnosis: "" });
 
   const fetchPatients = async () => {
-    if (!user) return;
-    const { data } = await supabase.from("patients").select("*").eq("user_id", user.id).order("created_at", { ascending: false });
+    if (!clinicOwnerId) return;
+    const { data } = await supabase.from("patients").select("*").eq("user_id", clinicOwnerId).order("created_at", { ascending: false });
     setPatients(data ?? []);
     setLoading(false);
   };
 
-  useEffect(() => { fetchPatients(); }, [user]);
+  useEffect(() => { fetchPatients(); }, [clinicOwnerId]);
 
-  const resetForm = () => { setForm({ name: "", phone: "", diagnosis: "" }); setEditing(null); };
+  const resetForm = () => { setForm({ name: "", phone: "", countryCode: "+254", diagnosis: "" }); setEditing(null); };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!user) return;
-    const payload = { user_id: user.id, name: form.name, phone: form.phone, diagnosis: form.diagnosis };
+    if (!clinicOwnerId) return;
+    const payload = { user_id: clinicOwnerId, name: form.name, phone: normalizePhoneNumber(form.countryCode, form.phone), diagnosis: form.diagnosis };
 
     if (editing) {
       const { error } = await supabase.from("patients").update(payload).eq("id", editing.id);
@@ -56,8 +66,9 @@ const PatientsPage = () => {
   };
 
   const handleEdit = (p: Tables<"patients">) => {
+    const nextPhone = splitPhoneNumber(p.phone);
     setEditing(p);
-    setForm({ name: p.name, phone: p.phone ?? "", diagnosis: p.diagnosis ?? "" });
+    setForm({ name: p.name, phone: nextPhone.phoneNumber, countryCode: nextPhone.countryCode, diagnosis: p.diagnosis ?? "" });
     setDialogOpen(true);
   };
 
@@ -87,7 +98,15 @@ const PatientsPage = () => {
                 <DialogHeader><DialogTitle>{editing ? "Edit Patient" : "Add Patient"}</DialogTitle></DialogHeader>
                 <form onSubmit={handleSubmit} className="space-y-4">
                   <div><Label>Name</Label><Input value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} required /></div>
-                  <div><Label>Phone</Label><Input value={form.phone} onChange={(e) => setForm({ ...form, phone: e.target.value })} /></div>
+                  <div>
+                    <Label>Phone Number</Label>
+                    <PhoneNumberInput
+                      countryCode={form.countryCode}
+                      phoneNumber={form.phone}
+                      onCountryCodeChange={(countryCode) => setForm({ ...form, countryCode })}
+                      onPhoneNumberChange={(phone) => setForm({ ...form, phone })}
+                    />
+                  </div>
                   <div><Label>Diagnosis</Label><Textarea value={form.diagnosis} onChange={(e) => setForm({ ...form, diagnosis: e.target.value })} /></div>
                   <Button type="submit" className="w-full">{editing ? "Update" : "Add"} Patient</Button>
                 </form>

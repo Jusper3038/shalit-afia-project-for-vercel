@@ -7,15 +7,15 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import type { Tables } from "@/integrations/supabase/types";
 
 const AuditLogsPage = () => {
-  const { user } = useAuth();
+  const { clinicOwnerId } = useAuth();
   const [logs, setLogs] = useState<Tables<"audit_logs">[]>([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    if (!user) return;
-    supabase.from("audit_logs").select("*").eq("user_id", user.id).order("created_at", { ascending: false }).limit(100)
+    if (!clinicOwnerId) return;
+    supabase.from("audit_logs").select("*").eq("user_id", clinicOwnerId).order("created_at", { ascending: false }).limit(100)
       .then(({ data }) => { setLogs(data ?? []); setLoading(false); });
-  }, [user]);
+  }, [clinicOwnerId]);
 
   return (
     <AppLayout>

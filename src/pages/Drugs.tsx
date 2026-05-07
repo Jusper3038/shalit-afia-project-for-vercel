@@ -36,6 +36,7 @@ type PendingSensitiveAction =
 const DrugsPage = () => {
   const {
     user,
+    clinicOwnerId,
     hasOwnerSecurityPin,
     isSensitiveAccessVerified,
     verifySensitiveAccess,
@@ -53,13 +54,13 @@ const DrugsPage = () => {
   const [pendingSensitiveAction, setPendingSensitiveAction] = useState<PendingSensitiveAction>(null);
 
   const fetchDrugs = async () => {
-    if (!user) return;
-    const { data } = await supabase.from("drugs").select("*").eq("user_id", user.id).order("created_at", { ascending: false });
+    if (!clinicOwnerId) return;
+    const { data } = await supabase.from("drugs").select("*").eq("user_id", clinicOwnerId).order("created_at", { ascending: false });
     setDrugs(data ?? []);
     setLoading(false);
   };
 
-  useEffect(() => { fetchDrugs(); }, [user]);
+  useEffect(() => { fetchDrugs(); }, [clinicOwnerId]);
 
   const resetForm = () => {
     setForm(emptyDrugForm);
@@ -98,9 +99,9 @@ const DrugsPage = () => {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!user) return;
+    if (!clinicOwnerId) return;
     const payload = {
-      user_id: user.id,
+      user_id: clinicOwnerId,
       name: form.name,
       serial_number: form.serial_number || null,
       expiry_date: form.expiry_date || null,
