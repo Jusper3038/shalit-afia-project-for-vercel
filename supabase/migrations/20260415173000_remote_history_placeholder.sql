@@ -1,0 +1,2 @@
+-- Placeholder migration to align local migration history with the linked remote project.
+-- The actual migration was already applied remotely before this repository was connected.

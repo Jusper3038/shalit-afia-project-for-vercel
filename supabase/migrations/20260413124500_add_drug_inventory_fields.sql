@@ -1,0 +1,4 @@
+ALTER TABLE public.drugs
+ADD COLUMN IF NOT EXISTS expiry_date DATE,
+ADD COLUMN IF NOT EXISTS serial_number TEXT,
+ADD COLUMN IF NOT EXISTS date_of_purchase DATE;
