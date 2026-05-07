@@ -47,7 +47,7 @@ const PhoneNumberInput = ({
   inputClassName,
   selectClassName,
 }: PhoneNumberInputProps) => (
-  <div className="grid grid-cols-[132px_minmax(0,1fr)] gap-2">
+  <div className="grid min-w-0 grid-cols-1 gap-2 sm:grid-cols-[132px_minmax(0,1fr)]">
     <Select value={countryCode} onValueChange={onCountryCodeChange} disabled={disabled}>
       <SelectTrigger aria-label="Country code" className={selectClassName}>
         <SelectValue placeholder="Code" />

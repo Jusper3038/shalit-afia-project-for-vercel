@@ -152,7 +152,7 @@ const TeamUsersSettings = () => {
   };
 
   return (
-    <Card>
+    <Card className="min-w-0 overflow-hidden">
       <CardHeader className="space-y-3">
         <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
           <div className="min-w-0">
@@ -162,9 +162,9 @@ const TeamUsersSettings = () => {
           <Badge className="w-fit" variant={activeInviteCount >= 2 ? "default" : "secondary"}>{activeInviteCount}/2 added</Badge>
         </div>
       </CardHeader>
-      <CardContent className="space-y-6">
-        <form onSubmit={handleCreateInvite} className="grid gap-3 lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_auto] lg:items-end">
-          <div className="space-y-2">
+      <CardContent className="min-w-0 space-y-6">
+        <form onSubmit={handleCreateInvite} className="grid min-w-0 gap-4 xl:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]">
+          <div className="min-w-0 space-y-2">
             <Label htmlFor="team-email">User Email</Label>
             <Input
               id="team-email"
@@ -175,7 +175,7 @@ const TeamUsersSettings = () => {
               disabled={activeInviteCount >= 2}
             />
           </div>
-          <div className="space-y-2">
+          <div className="min-w-0 space-y-2">
             <Label htmlFor="team-phone">Phone Number</Label>
             <PhoneNumberInput
               id="team-phone"
@@ -187,22 +187,24 @@ const TeamUsersSettings = () => {
               required
             />
           </div>
-          <Button type="submit" className="w-full lg:w-auto" disabled={creating || activeInviteCount >= 2}>
-            <Plus className="mr-2 h-4 w-4" />
-            {creating ? "Creating..." : "Add User"}
-          </Button>
-          <div className="lg:col-span-3">
+          <div className="min-w-0 xl:col-span-2">
+            <Button type="submit" className="w-full sm:w-fit" disabled={creating || activeInviteCount >= 2}>
+              <Plus className="mr-2 h-4 w-4" />
+              {creating ? "Creating..." : "Add User"}
+            </Button>
+          </div>
+          <div className="min-w-0 xl:col-span-2">
             <Label>Allowed Apps</Label>
-            <div className="mt-2 grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
+            <div className="mt-2 grid min-w-0 grid-cols-[repeat(auto-fit,minmax(min(100%,18rem),1fr))] gap-3">
               {APP_PERMISSION_OPTIONS.map((option) => (
-                <label key={option.key} className="flex cursor-pointer items-start gap-3 rounded-md border p-3 transition-colors hover:bg-accent/50">
+                <label key={option.key} className="flex min-w-0 cursor-pointer items-start gap-3 rounded-md border p-3 transition-colors hover:bg-accent/50">
                   <Checkbox checked={selectedApps.includes(option.key)} onCheckedChange={() => toggleSelectedApp(option.key)} disabled={activeInviteCount >= 2} />
                   <span className="min-w-0">
                     <span className="flex min-w-0 items-center gap-2 font-medium">
                       <option.icon className="h-4 w-4 shrink-0 text-primary" />
-                      {option.label}
+                      <span className="min-w-0 truncate">{option.label}</span>
                     </span>
-                    <span className="mt-1 block text-xs text-muted-foreground">{option.description}</span>
+                    <span className="mt-1 block min-w-0 text-sm leading-5 text-muted-foreground">{option.description}</span>
                   </span>
                 </label>
               ))}
