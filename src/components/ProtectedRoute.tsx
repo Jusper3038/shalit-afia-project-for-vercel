@@ -8,6 +8,7 @@ import { PasswordInput } from "@/components/ui/password-input";
 import { Label } from "@/components/ui/label";
 import { toast } from "sonner";
 import type { AppPermission } from "@/lib/app-permissions";
+import type { ReleasedAppKey } from "@/lib/app-releases";
 
 type ProtectedRouteProps = {
   children: React.ReactNode;
@@ -16,6 +17,7 @@ type ProtectedRouteProps = {
   requireSensitiveVerification?: boolean;
   requirePlatformOwner?: boolean;
   requiredApp?: AppPermission;
+  requiredRelease?: ReleasedAppKey;
 };
 
 const ProtectedRoute = ({
@@ -25,6 +27,7 @@ const ProtectedRoute = ({
   requireSensitiveVerification = false,
   requirePlatformOwner = false,
   requiredApp,
+  requiredRelease,
 }: ProtectedRouteProps) => {
   const {
     session,
@@ -39,6 +42,7 @@ const ProtectedRoute = ({
     setOwnerSecurityPin,
     resetOwnerSecurityPin,
     canAccessApp,
+    isAppReleased,
     allowedApps,
   } = useAuth();
   const [pin, setPin] = useState("");
@@ -74,6 +78,22 @@ const ProtectedRoute = ({
 
   if (requirePlatformOwner && !isPlatformOwner) {
     return <Navigate to={redirectTo} replace />;
+  }
+
+  const releaseByApp: Record<AppPermission, ReleasedAppKey> = {
+    dashboard: "pharmacy",
+    inventory: "pharmacy",
+    patients: "pharmacy",
+    billing: "pharmacy",
+    payments: "payments",
+    audit_logs: "audit_logs",
+    settings: "settings",
+  };
+
+  const releaseKey = requiredRelease ?? (requiredApp ? releaseByApp[requiredApp] : null);
+
+  if (releaseKey && !isAppReleased(releaseKey)) {
+    return <Navigate to="/home" replace />;
   }
 
   if (requiredApp && !canAccessApp(requiredApp)) {

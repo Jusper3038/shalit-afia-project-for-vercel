@@ -16,7 +16,7 @@ const Login = () => {
   const [loading, setLoading] = useState(false);
   const navigate = useNavigate();
   const location = useLocation();
-  const redirectPath = (location.state as { from?: string } | null)?.from ?? "/pharmacy/billing";
+  const redirectPath = (location.state as { from?: string } | null)?.from ?? "/home";
 
   useEffect(() => {
     const blockedMessage = sessionStorage.getItem("auth_blocked_message");

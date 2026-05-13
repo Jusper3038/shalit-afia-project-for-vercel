@@ -16,6 +16,8 @@ const DrugsPage = lazy(() => import("./pages/Drugs"));
 const PatientsPage = lazy(() => import("./pages/Patients"));
 const BillingPage = lazy(() => import("./pages/Billing"));
 const PaymentsPage = lazy(() => import("./pages/Payments"));
+const EcommercePage = lazy(() => import("./pages/Ecommerce"));
+const StorefrontPage = lazy(() => import("./pages/Storefront"));
 const AuditLogsPage = lazy(() => import("./pages/AuditLogs"));
 const UsersPage = lazy(() => import("./pages/Users"));
 const SettingsPage = lazy(() => import("./pages/Settings"));
@@ -45,6 +47,8 @@ const App = () => (
               <Route path="/home" element={<Index keepLandingVisible />} />
               <Route path="/login" element={<Login />} />
               <Route path="/register" element={<Register />} />
+              <Route path="/shop" element={<StorefrontPage />} />
+              <Route path="/store/:storeSlug" element={<StorefrontPage />} />
               <Route path="/pharmacy" element={<ProtectedRoute><PharmacyPage /></ProtectedRoute>} />
               <Route path="/pharmacy/dashboard" element={<ProtectedRoute requiredApp="dashboard" requireSensitiveVerification><Dashboard /></ProtectedRoute>} />
               <Route path="/pharmacy/inventory" element={<ProtectedRoute requiredApp="inventory"><DrugsPage /></ProtectedRoute>} />
@@ -55,6 +59,7 @@ const App = () => (
               <Route path="/patients" element={<ProtectedRoute requiredApp="patients"><Navigate to="/pharmacy/patients" replace /></ProtectedRoute>} />
               <Route path="/billing" element={<ProtectedRoute requiredApp="billing"><Navigate to="/pharmacy/billing" replace /></ProtectedRoute>} />
               <Route path="/payments" element={<ProtectedRoute requiredApp="payments" requireSensitiveVerification><PaymentsPage /></ProtectedRoute>} />
+              <Route path="/ecommerce" element={<ProtectedRoute allowedRoles={["admin"]} requiredRelease="ecommerce"><EcommercePage /></ProtectedRoute>} />
               <Route path="/team" element={<ProtectedRoute requiredApp="settings"><Navigate to="/settings" replace /></ProtectedRoute>} />
               <Route path="/audit-logs" element={<ProtectedRoute requiredApp="audit_logs" requireSensitiveVerification><AuditLogsPage /></ProtectedRoute>} />
               <Route path="/users" element={<ProtectedRoute requirePlatformOwner><UsersPage /></ProtectedRoute>} />

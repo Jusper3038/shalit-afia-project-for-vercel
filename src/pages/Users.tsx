@@ -9,9 +9,10 @@ import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { toast } from "sonner";
-import { Inbox, Mail, Power, ShieldCheck, Trash2, Users as UsersIcon } from "lucide-react";
+import { Inbox, Mail, Power, Rocket, ShieldCheck, Trash2, Users as UsersIcon } from "lucide-react";
 import type { Enums, Tables } from "@/integrations/supabase/types";
 import { readClinicCache, withQueryTimeout, writeClinicCache } from "@/lib/clinic-cache";
+import { ALL_RELEASED_APPS, RELEASED_APP_OPTIONS, type ReleasedAppKey } from "@/lib/app-releases";
 
 type SystemUser = {
   clinic_name: string;
@@ -29,12 +30,14 @@ type SystemUser = {
 type LeadRow = Tables<"leads">;
 
 const UsersPage = () => {
-  const { isPlatformOwner, claimPlatformOwnerAccess, loading, user } = useAuth();
+  const { isPlatformOwner, claimPlatformOwnerAccess, loading, user, releasedApps, refreshReleasedApps } = useAuth();
   const [users, setUsers] = useState<SystemUser[]>([]);
   const [leads, setLeads] = useState<LeadRow[]>([]);
+  const [draftReleasedApps, setDraftReleasedApps] = useState<ReleasedAppKey[]>(releasedApps);
   const [searchTerm, setSearchTerm] = useState("");
   const [loadingUsers, setLoadingUsers] = useState(false);
   const [loadingLeads, setLoadingLeads] = useState(false);
+  const [savingReleases, setSavingReleases] = useState(false);
   const [claimingAccess, setClaimingAccess] = useState(false);
   const [deletingUserId, setDeletingUserId] = useState<string | null>(null);
   const [updatingStatusUserId, setUpdatingStatusUserId] = useState<string | null>(null);
@@ -92,6 +95,10 @@ const UsersPage = () => {
   };
 
   useEffect(() => {
+    setDraftReleasedApps(releasedApps);
+  }, [releasedApps]);
+
+  useEffect(() => {
     if (!isPlatformOwner) {
       setUsers([]);
       setLeads([]);
@@ -101,6 +108,38 @@ const UsersPage = () => {
     void fetchUsers();
     void fetchLeads();
   }, [isPlatformOwner]);
+
+  const handleToggleReleasedApp = (app: ReleasedAppKey) => {
+    setDraftReleasedApps((current) =>
+      current.includes(app)
+        ? current.filter((item) => item !== app)
+        : [...current, app]
+    );
+  };
+
+  const handleSaveReleases = async () => {
+    setSavingReleases(true);
+    const rows = ALL_RELEASED_APPS.map((app) => ({
+      app_key: app,
+      is_enabled: draftReleasedApps.includes(app),
+      updated_by: user?.id ?? null,
+      updated_at: new Date().toISOString(),
+    }));
+
+    const { error } = await (supabase as any)
+      .from("platform_app_releases")
+      .upsert(rows, { onConflict: "app_key" });
+    setSavingReleases(false);
+
+    if (error) {
+      toast.error(error.message);
+      return;
+    }
+
+    await logAudit("Updated live applications", `Live apps: ${draftReleasedApps.join(", ") || "none"}`);
+    await refreshReleasedApps();
+    toast.success("Live application settings saved.");
+  };
 
   const handleDelete = async (account: SystemUser) => {
     const confirmed = window.confirm(
@@ -254,6 +293,60 @@ const UsersPage = () => {
             </CardContent>
           </Card>
         </div>
+
+        <Card className="border-primary/20">
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <Rocket className="h-5 w-5" />
+              Live Applications
+            </CardTitle>
+            <CardDescription>
+              Choose which finished modules are visible and accessible to app users. Platform Accounts stays creator-only.
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
+              {RELEASED_APP_OPTIONS.map((option) => {
+                const enabled = draftReleasedApps.includes(option.key);
+                return (
+                  <button
+                    key={option.key}
+                    type="button"
+                    onClick={() => handleToggleReleasedApp(option.key)}
+                    className={`rounded-lg border p-4 text-left transition ${
+                      enabled
+                        ? "border-primary bg-primary/5 shadow-sm"
+                        : "border-border bg-muted/30 opacity-75"
+                    }`}
+                  >
+                    <div className="flex items-start gap-3">
+                      <div className={`rounded-md p-2 ${enabled ? "bg-primary text-primary-foreground" : "bg-muted text-muted-foreground"}`}>
+                        <option.icon className="h-5 w-5" />
+                      </div>
+                      <div className="min-w-0 flex-1">
+                        <div className="flex items-center justify-between gap-2">
+                          <p className="font-semibold">{option.label}</p>
+                          <Badge variant={enabled ? "default" : "secondary"}>
+                            {enabled ? "Live" : "Hidden"}
+                          </Badge>
+                        </div>
+                        <p className="mt-1 text-sm text-muted-foreground">{option.description}</p>
+                      </div>
+                    </div>
+                  </button>
+                );
+              })}
+            </div>
+            <div className="flex flex-col gap-2 border-t pt-4 sm:flex-row sm:items-center sm:justify-between">
+              <p className="text-sm text-muted-foreground">
+                Hidden modules disappear from Home, the sidebar, and protected routes.
+              </p>
+              <Button type="button" onClick={handleSaveReleases} disabled={savingReleases}>
+                {savingReleases ? "Saving..." : "Save Live Apps"}
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
 
         <Card className="border-primary/20">
           <CardHeader>

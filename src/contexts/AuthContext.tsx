@@ -3,6 +3,7 @@ import { Session, User } from "@supabase/supabase-js";
 import { supabase } from "@/integrations/supabase/client";
 import type { Tables } from "@/integrations/supabase/types";
 import { ALL_APP_PERMISSIONS, type AppPermission } from "@/lib/app-permissions";
+import { ALL_RELEASED_APPS, type ReleasedAppKey } from "@/lib/app-releases";
 
 const SENSITIVE_ACCESS_KEY = "sensitive_access_verified_at";
 const SENSITIVE_ACCESS_WINDOW_MS = 15 * 60 * 1000;
@@ -31,6 +32,9 @@ interface AuthContextType {
   clinicOwnerId: string | null;
   allowedApps: AppPermission[];
   canAccessApp: (permission: AppPermission) => boolean;
+  releasedApps: ReleasedAppKey[];
+  isAppReleased: (app: ReleasedAppKey) => boolean;
+  refreshReleasedApps: () => Promise<void>;
   isPlatformOwner: boolean;
   isPlatformOwnerReady: boolean;
   loading: boolean;
@@ -52,6 +56,9 @@ const AuthContext = createContext<AuthContextType>({
   clinicOwnerId: null,
   allowedApps: [],
   canAccessApp: () => false,
+  releasedApps: ALL_RELEASED_APPS,
+  isAppReleased: () => true,
+  refreshReleasedApps: async () => {},
   isPlatformOwner: false,
   isPlatformOwnerReady: false,
   loading: true,
@@ -74,6 +81,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const [role, setRole] = useState<string | null>(null);
   const [clinicOwnerId, setClinicOwnerId] = useState<string | null>(null);
   const [allowedApps, setAllowedApps] = useState<AppPermission[]>([]);
+  const [releasedApps, setReleasedApps] = useState<ReleasedAppKey[]>(ALL_RELEASED_APPS);
   const [isPlatformOwner, setIsPlatformOwner] = useState(false);
   const [isPlatformOwnerReady, setIsPlatformOwnerReady] = useState(false);
   const [hasOwnerSecurityPin, setHasOwnerSecurityPin] = useState(false);
@@ -132,6 +140,28 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     }
   };
 
+  const refreshReleasedApps = async () => {
+    const { data, error } = await withTimeout(
+      (supabase as any)
+        .from("platform_app_releases")
+        .select("app_key,is_enabled"),
+      { data: null, error: null }
+    );
+
+    if (error || !Array.isArray(data)) {
+      setReleasedApps(ALL_RELEASED_APPS);
+      return;
+    }
+
+    const releaseRows = data as Array<{ app_key: ReleasedAppKey; is_enabled: boolean }>;
+    const disabledApps = new Set(
+      releaseRows
+        .filter((row) => !row.is_enabled)
+        .map((row) => row.app_key)
+    );
+    setReleasedApps(ALL_RELEASED_APPS.filter((app) => !disabledApps.has(app)));
+  };
+
   const fetchPlatformOwnerStatus = async (userId: string) => {
     setIsPlatformOwnerReady(false);
     const { data, error } = await withTimeout(
@@ -157,13 +187,16 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         void Promise.allSettled([
           fetchProfile(session.user.id),
           fetchRole(session.user.id),
-          fetchPlatformOwnerStatus(session.user.id),
-          fetchOwnerSecurityPinStatus(),
         ]).finally(() => {
           if (loadVersion === loadVersionRef.current) {
             setLoading(false);
           }
         });
+
+        // Non-critical checks run in background so the main app can render sooner.
+        void fetchPlatformOwnerStatus(session.user.id);
+        void fetchOwnerSecurityPinStatus();
+        void refreshReleasedApps();
       } else {
         setProfile(null);
         setRole(null);
@@ -296,6 +329,8 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     return allowedApps.includes(permission);
   };
 
+  const isAppReleased = (app: ReleasedAppKey) => releasedApps.includes(app);
+
   return (
     <AuthContext.Provider
       value={{
@@ -306,6 +341,9 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         clinicOwnerId,
         allowedApps,
         canAccessApp,
+        releasedApps,
+        isAppReleased,
+        refreshReleasedApps,
         isPlatformOwner,
         isPlatformOwnerReady,
         loading,

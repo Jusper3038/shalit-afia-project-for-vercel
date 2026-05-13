@@ -6,7 +6,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
 import { Badge } from "@/components/ui/badge";
-import { AlertTriangle, HeartPulse, Loader2, MessageCircle, PackageCheck, Send, Sparkles, TrendingUp } from "lucide-react";
+import { AlertTriangle, Loader2, PackageCheck, Send, TrendingUp } from "lucide-react";
 import type { Tables } from "@/integrations/supabase/types";
 import { getClinicDayKey, getClinicWeekStartKey, getMonthLabel, getTransactionSaleDay, getTransactionSaleMonth, getTransactionSaleYear } from "@/lib/reporting";
 import { getDaysUntilExpiry, getExpiredStockCostLoss, getSellableStockQuantity, isExpiredDrug, isExpiringSoonDrug } from "@/lib/inventory";
@@ -14,6 +14,30 @@ import { readClinicCache, withQueryTimeout, writeClinicCache } from "@/lib/clini
 
 const OLLAMA_MODEL = import.meta.env.VITE_OLLAMA_MODEL || "llama3.1:8b";
 const GEMINI_MODEL = import.meta.env.VITE_GEMINI_MODEL || "gemini-2.5-flash";
+
+const AfiaAvatar = ({ size = "md" }: { size?: "sm" | "md" }) => {
+  const shellSize = size === "sm" ? "h-9 w-9" : "h-12 w-12";
+  const hairCap = size === "sm" ? "inset-x-1 top-1 h-5" : "inset-x-1.5 top-1.5 h-7";
+  const sideHair = size === "sm" ? "top-2 h-5 w-3" : "top-3 h-7 w-4";
+  const faceSize = size === "sm" ? "top-2.5 h-[19px] w-[20px]" : "top-4 h-6 w-7";
+  const eyePosition = size === "sm" ? "top-2" : "top-2.5";
+  const smileSize = size === "sm" ? "bottom-1 h-2 w-3" : "bottom-1.5 h-2.5 w-4";
+  const coatSize = size === "sm" ? "h-3 w-7" : "h-4 w-9";
+
+  return (
+    <span className={`relative flex ${shellSize} shrink-0 items-center justify-center overflow-hidden rounded-full bg-gradient-to-br from-cyan-100 via-cyan-200 to-primary shadow-inner shadow-white/30`}>
+      <span className={`absolute ${hairCap} rounded-t-full bg-slate-950/80`} />
+      <span className={`absolute left-1 ${sideHair} rounded-full bg-slate-950/80`} />
+      <span className={`absolute right-1 ${sideHair} rounded-full bg-slate-950/80`} />
+      <span className={`absolute ${faceSize} rounded-full bg-amber-100 shadow-sm`}>
+        <span className={`absolute left-[30%] ${eyePosition} h-1 w-1 rounded-full bg-slate-800`} />
+        <span className={`absolute right-[30%] ${eyePosition} h-1 w-1 rounded-full bg-slate-800`} />
+        <span className={`absolute left-1/2 ${smileSize} -translate-x-1/2 rounded-b-full border-b-2 border-slate-700`} />
+      </span>
+      <span className={`absolute bottom-0 ${coatSize} rounded-t-full bg-white/95`} />
+    </span>
+  );
+};
 
 type Message = {
   id: string;
@@ -474,66 +498,73 @@ const ClinicAssistant = () => {
       <SheetTrigger asChild>
         <Button
           type="button"
-          size="icon"
-          className="fixed bottom-5 right-5 z-40 h-16 w-16 rounded-2xl border border-cyan-200/40 bg-gradient-to-br from-cyan-400 to-primary text-primary-foreground shadow-2xl shadow-primary/30 transition-transform hover:-translate-y-1 hover:scale-105 sm:bottom-6 sm:right-6"
+          className="group fixed bottom-5 right-5 z-40 h-14 rounded-full border border-white/30 bg-slate-950 px-3.5 pr-4 text-white shadow-[0_18px_45px_rgba(15,23,42,0.28)] transition-all duration-200 hover:-translate-y-1 hover:bg-slate-900 hover:shadow-[0_22px_55px_rgba(15,23,42,0.34)] sm:bottom-6 sm:right-6"
           aria-label="Open clinic assistant"
         >
-          <MessageCircle className="h-7 w-7" />
-          <span className="absolute -right-1 -top-1 h-5 w-5 rounded-full border-2 border-background bg-emerald-500 shadow-sm" />
+          <span className="absolute inset-0 rounded-full bg-gradient-to-r from-cyan-400/25 via-transparent to-emerald-300/20 opacity-80" />
+          <span className="relative flex items-center gap-2.5">
+            <AfiaAvatar size="sm" />
+            <span className="hidden flex-col items-start leading-none sm:flex">
+              <span className="text-[11px] font-semibold uppercase tracking-[0.18em] text-cyan-100/80">Ask Afia</span>
+              <span className="mt-1 text-xs font-medium text-white/75">on duty</span>
+            </span>
+          </span>
+          <span className="absolute -right-0.5 -top-0.5 flex h-4 w-4 rounded-full border-2 border-slate-50 bg-emerald-400 shadow-sm">
+            <span className="m-auto h-1.5 w-1.5 rounded-full bg-white/80" />
+          </span>
         </Button>
       </SheetTrigger>
       <SheetContent side="right" className="flex w-full max-w-full flex-col gap-0 overflow-hidden border-l-0 bg-slate-50 p-0 sm:max-w-xl">
-        <div className="relative overflow-hidden border-b bg-gradient-to-br from-slate-950 via-blue-950 to-slate-900 px-4 py-5 text-white sm:px-5">
-          <div className="absolute -right-12 -top-16 h-44 w-44 rounded-full bg-cyan-400/20 blur-3xl" />
+        <div className="relative overflow-hidden border-b bg-[linear-gradient(135deg,#fff7ed_0%,#ecfeff_48%,#f8fafc_100%)] px-4 py-5 text-slate-950 sm:px-5">
+          <div className="absolute -right-16 -top-16 h-48 w-48 rounded-full bg-cyan-200/40 blur-3xl" />
+          <div className="absolute -bottom-20 left-10 h-44 w-44 rounded-full bg-amber-200/35 blur-3xl" />
           <SheetHeader className="text-left">
             <div className="relative flex items-start gap-3 pr-8">
-              <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl border border-white/15 bg-white/10 text-cyan-200 shadow-lg backdrop-blur">
-                <HeartPulse className="h-6 w-6" />
-              </div>
+              <AfiaAvatar />
               <div className="min-w-0">
                 <div className="flex flex-wrap items-center gap-2">
-                  <SheetTitle className="text-base text-white sm:text-lg">Shalit Care Copilot</SheetTitle>
-                  <Badge className="h-6 rounded-full border border-emerald-300/30 bg-emerald-400/15 px-2 text-emerald-100 hover:bg-emerald-400/15">
-                    Live
+                  <SheetTitle className="text-base text-slate-950 sm:text-lg">Afia</SheetTitle>
+                  <Badge className="h-6 rounded-full border border-emerald-200 bg-emerald-50 px-2 text-emerald-700 hover:bg-emerald-50">
+                    On duty
                   </Badge>
                 </div>
-                <SheetDescription className="mt-1 text-white/70">
-                  Calm answers for sales, stock, payments, profit, and next best actions.
+                <SheetDescription className="mt-1 text-slate-600">
+                  Your friendly clinic aide for sales, stock, payments, profit, and next steps.
                 </SheetDescription>
               </div>
             </div>
           </SheetHeader>
 
           <div className="relative mt-5 grid grid-cols-3 gap-2">
-            <div className="rounded-2xl border border-white/10 bg-white/10 px-3 py-3 backdrop-blur">
-              <div className="flex items-center gap-1.5 text-xs text-white/60">
-                <TrendingUp className="h-3.5 w-3.5 text-cyan-200" />
+            <div className="rounded-2xl border border-white/70 bg-white/75 px-3 py-3 shadow-sm backdrop-blur">
+              <div className="flex items-center gap-1.5 text-xs text-slate-500">
+                <TrendingUp className="h-3.5 w-3.5 text-cyan-600" />
                 Today
               </div>
-              <p className="mt-1 truncate text-sm font-semibold text-white">{formatCurrency(analytics.todaySales)}</p>
+              <p className="mt-1 truncate text-sm font-semibold text-slate-950">{formatCurrency(analytics.todaySales)}</p>
             </div>
-            <div className="rounded-2xl border border-white/10 bg-white/10 px-3 py-3 backdrop-blur">
-              <div className="flex items-center gap-1.5 text-xs text-white/60">
-                <PackageCheck className="h-3.5 w-3.5 text-emerald-200" />
+            <div className="rounded-2xl border border-white/70 bg-white/75 px-3 py-3 shadow-sm backdrop-blur">
+              <div className="flex items-center gap-1.5 text-xs text-slate-500">
+                <PackageCheck className="h-3.5 w-3.5 text-emerald-600" />
                 Stock
               </div>
-              <p className="mt-1 truncate text-sm font-semibold text-white">{data.drugs.length} items</p>
+              <p className="mt-1 truncate text-sm font-semibold text-slate-950">{data.drugs.length} items</p>
             </div>
-            <div className="rounded-2xl border border-white/10 bg-white/10 px-3 py-3 backdrop-blur">
-              <div className="flex items-center gap-1.5 text-xs text-white/60">
-                <AlertTriangle className="h-3.5 w-3.5 text-amber-200" />
+            <div className="rounded-2xl border border-white/70 bg-white/75 px-3 py-3 shadow-sm backdrop-blur">
+              <div className="flex items-center gap-1.5 text-xs text-slate-500">
+                <AlertTriangle className="h-3.5 w-3.5 text-amber-600" />
                 Alerts
               </div>
-              <p className="mt-1 truncate text-sm font-semibold text-white">
+              <p className="mt-1 truncate text-sm font-semibold text-slate-950">
                 {analytics.lowStockItems.length + analytics.outOfStockItems.length + analytics.expiringItems.length}
               </p>
             </div>
           </div>
 
           <div className="relative mt-3 flex flex-wrap gap-2">
-            <Badge variant="outline" className="rounded-full border-white/15 bg-white/10 text-white">{profile?.clinic_name || "Clinic"}</Badge>
-            <Badge variant="outline" className="rounded-full border-white/15 bg-white/10 text-white">{analytics.currentMonthLabel}</Badge>
-            <Badge variant="outline" className="rounded-full border-white/15 bg-white/10 text-white">{GEMINI_MODEL}</Badge>
+            <Badge variant="outline" className="rounded-full border-slate-200 bg-white/80 text-slate-700">{profile?.clinic_name || "Clinic"}</Badge>
+            <Badge variant="outline" className="rounded-full border-slate-200 bg-white/80 text-slate-700">{analytics.currentMonthLabel}</Badge>
+            <Badge variant="outline" className="rounded-full border-slate-200 bg-white/80 text-slate-700">{GEMINI_MODEL}</Badge>
           </div>
         </div>
 
@@ -569,8 +600,8 @@ const ClinicAssistant = () => {
                     className={`flex gap-2 ${message.role === "user" ? "justify-end" : "justify-start"}`}
                   >
                     {message.role === "assistant" && (
-                      <div className="mt-1 flex h-9 w-9 shrink-0 items-center justify-center rounded-2xl border border-cyan-100 bg-white text-cyan-700 shadow-sm">
-                        <Sparkles className="h-4 w-4" />
+                      <div className="mt-1">
+                        <AfiaAvatar size="sm" />
                       </div>
                     )}
                     <div

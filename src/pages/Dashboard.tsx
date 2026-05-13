@@ -6,7 +6,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { DollarSign, Users, Package2, Receipt, AlertTriangle, Download } from "lucide-react";
+import { DollarSign, Package2, Receipt, AlertTriangle, Download, type LucideIcon } from "lucide-react";
 import AppLayout from "@/components/AppLayout";
 import type { Tables } from "@/integrations/supabase/types";
 import {
@@ -40,6 +40,64 @@ import {
 import { readClinicCache, withQueryTimeout, writeClinicCache } from "@/lib/clinic-cache";
 
 type AlertFilter = "all" | "expired" | "expiring" | "out" | "low";
+type MetricTone = "default" | "success" | "warning" | "danger";
+
+const toneClasses: Record<MetricTone, { icon: string; value: string; bar: string }> = {
+  default: {
+    icon: "bg-primary/10 text-primary",
+    value: "text-foreground",
+    bar: "bg-primary",
+  },
+  success: {
+    icon: "bg-emerald-50 text-emerald-700",
+    value: "text-emerald-700",
+    bar: "bg-emerald-500",
+  },
+  warning: {
+    icon: "bg-amber-50 text-amber-700",
+    value: "text-amber-700",
+    bar: "bg-amber-500",
+  },
+  danger: {
+    icon: "bg-red-50 text-red-700",
+    value: "text-red-700",
+    bar: "bg-red-500",
+  },
+};
+
+const MetricCard = ({
+  title,
+  value,
+  description,
+  icon: Icon,
+  tone = "default",
+}: {
+  title: string;
+  value: string | number;
+  description: string;
+  icon: LucideIcon;
+  tone?: MetricTone;
+}) => {
+  const classes = toneClasses[tone];
+
+  return (
+    <Card className="overflow-hidden transition-shadow hover:shadow-md">
+      <div className={`h-1 ${classes.bar}`} />
+      <CardHeader className="flex flex-row items-start justify-between gap-3 pb-2">
+        <div className="min-w-0">
+          <CardTitle className="text-sm font-medium text-muted-foreground">{title}</CardTitle>
+        </div>
+        <div className={`rounded-md p-2 ${classes.icon}`}>
+          <Icon className="h-4 w-4" />
+        </div>
+      </CardHeader>
+      <CardContent>
+        <div className={`text-2xl font-bold tracking-tight ${classes.value}`}>{value}</div>
+        <p className="mt-1 text-xs leading-5 text-muted-foreground">{description}</p>
+      </CardContent>
+    </Card>
+  );
+};
 
 const Dashboard = () => {
   const { clinicOwnerId } = useAuth();
@@ -235,20 +293,23 @@ const Dashboard = () => {
   return (
     <AppLayout>
       <div className="space-y-4 sm:space-y-6">
-        <div className="animate-in fade-in-50 slide-in-from-top-2 duration-500 rounded-lg border bg-gradient-to-br from-primary/10 via-background to-amber-500/10 p-4 shadow-sm sm:p-6">
-          <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
+        <div className="rounded-lg border bg-card p-4 shadow-sm sm:p-6">
+          <div className="flex flex-col gap-5 lg:flex-row lg:items-end lg:justify-between">
             <div className="min-w-0">
-              <h2 className="text-2xl font-bold tracking-tight sm:text-3xl">Dashboard</h2>
+              <div className="flex flex-wrap items-center gap-2">
+                <h2 className="text-2xl font-bold tracking-tight sm:text-3xl">Dashboard</h2>
+                <Badge variant="secondary">{rangeLabel}</Badge>
+              </div>
               <p className="mt-1 text-sm text-muted-foreground">
                 Quick view of sales, stock health, and profit trends for {rangeLabel.toLowerCase()}.
               </p>
               <p className="mt-1 text-xs text-muted-foreground">{periodDescription}</p>
-              <div className="mt-3 inline-flex flex-col rounded-lg border bg-background/80 px-3 py-2 text-sm shadow-sm">
+              <div className="mt-3 inline-flex flex-col rounded-md border bg-muted/40 px-3 py-2 text-sm">
                 <span className="font-medium">Current Date: {formatClinicDate(now)}</span>
                 <span className="text-muted-foreground">Current Time: {formatClinicTime(now)}</span>
               </div>
             </div>
-            <div className="grid grid-cols-2 gap-2 sm:flex sm:flex-wrap">
+            <div className="grid grid-cols-2 gap-2 sm:flex sm:flex-wrap lg:justify-end">
               {([
                 { label: "Daily", value: "daily" },
                 { label: "Weekly", value: "weekly" },
@@ -261,7 +322,7 @@ const Dashboard = () => {
                   type="button"
                   size="sm"
                   variant={salesPeriod === option.value ? "default" : "outline"}
-                  className="min-w-0 flex-1 transition-transform duration-200 hover:-translate-y-0.5 sm:flex-none"
+                  className="min-w-0 flex-1 sm:flex-none"
                   onClick={() => setSalesPeriod(option.value)}
                 >
                   {option.label}
@@ -335,62 +396,43 @@ const Dashboard = () => {
         </div>
 
         <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-5">
-          <Card className="animate-in fade-in-50 slide-in-from-bottom-2 duration-500 transition-transform hover:-translate-y-1 hover:shadow-lg">
-            <CardHeader className="flex flex-row items-center justify-between pb-2">
-              <CardTitle className="text-sm font-medium">Total Sales</CardTitle>
-              <DollarSign className="h-4 w-4 text-muted-foreground" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold">KSh {totalSales.toLocaleString()}</div>
-              <p className="text-xs text-muted-foreground">Money from recorded bills in {rangeLabel.toLowerCase()}</p>
-            </CardContent>
-          </Card>
-          <Card className="animate-in fade-in-50 slide-in-from-bottom-2 duration-500 delay-100 transition-transform hover:-translate-y-1 hover:shadow-lg">
-            <CardHeader className="flex flex-row items-center justify-between pb-2">
-              <CardTitle className="text-sm font-medium">Profit Made</CardTitle>
-              <DollarSign className="h-4 w-4 text-muted-foreground" />
-            </CardHeader>
-            <CardContent>
-              <div className={`text-2xl font-bold ${profitMade >= 0 ? "text-green-600" : "text-red-600"}`}>
-                KSh {profitMade.toLocaleString()}
-              </div>
-              <p className="text-xs text-muted-foreground">Total sales minus the recorded buying cost of sold items</p>
-            </CardContent>
-          </Card>
-          <Card className="animate-in fade-in-50 slide-in-from-bottom-2 duration-500 delay-150 transition-transform hover:-translate-y-1 hover:shadow-lg">
-            <CardHeader className="flex flex-row items-center justify-between pb-2">
-              <CardTitle className="text-sm font-medium">Expired Stock Loss</CardTitle>
-              <AlertTriangle className="h-4 w-4 text-destructive" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold text-destructive">KSh {expiredStockCostLoss.toLocaleString()}</div>
-              <p className="text-xs text-muted-foreground">{expiredStockUnits} expired unit(s) deducted automatically</p>
-            </CardContent>
-          </Card>
-          <Card className="animate-in fade-in-50 slide-in-from-bottom-2 duration-500 delay-200 transition-transform hover:-translate-y-1 hover:shadow-lg">
-            <CardHeader className="flex flex-row items-center justify-between pb-2">
-              <CardTitle className="text-sm font-medium">Bills Recorded</CardTitle>
-              <Receipt className="h-4 w-4 text-muted-foreground" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold">{totalBills}</div>
-              <p className="text-xs text-muted-foreground">Sale lines recorded in {rangeLabel.toLowerCase()}</p>
-            </CardContent>
-          </Card>
-          <Card className="animate-in fade-in-50 slide-in-from-bottom-2 duration-500 delay-300 transition-transform hover:-translate-y-1 hover:shadow-lg">
-            <CardHeader className="flex flex-row items-center justify-between pb-2">
-              <CardTitle className="text-sm font-medium">Items In Stock</CardTitle>
-              <Package2 className="h-4 w-4 text-muted-foreground" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold">{totalItemsInStock}</div>
-              <p className="text-xs text-muted-foreground">Usable units on hand after expired stock deduction</p>
-            </CardContent>
-          </Card>
+          <MetricCard
+            title="Total Sales"
+            value={`KSh ${totalSales.toLocaleString()}`}
+            description={`Money from recorded bills in ${rangeLabel.toLowerCase()}`}
+            icon={DollarSign}
+          />
+          <MetricCard
+            title="Profit Made"
+            value={`KSh ${profitMade.toLocaleString()}`}
+            description="Total sales minus the recorded buying cost of sold items"
+            icon={DollarSign}
+            tone={profitMade >= 0 ? "success" : "danger"}
+          />
+          <MetricCard
+            title="Expired Stock Loss"
+            value={`KSh ${expiredStockCostLoss.toLocaleString()}`}
+            description={`${expiredStockUnits} expired unit(s) deducted automatically`}
+            icon={AlertTriangle}
+            tone="danger"
+          />
+          <MetricCard
+            title="Bills Recorded"
+            value={totalBills}
+            description={`Sale lines recorded in ${rangeLabel.toLowerCase()}`}
+            icon={Receipt}
+          />
+          <MetricCard
+            title="Items In Stock"
+            value={totalItemsInStock}
+            description="Usable units on hand after expired stock deduction"
+            icon={Package2}
+            tone="warning"
+          />
         </div>
 
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-2">
-          <Card className="animate-in fade-in-50 slide-in-from-bottom-2 duration-500 delay-100">
+          <Card>
             <CardHeader className="pb-2">
               <CardTitle className="text-sm font-medium">Patients</CardTitle>
             </CardHeader>
@@ -399,7 +441,7 @@ const Dashboard = () => {
               <p className="text-xs text-muted-foreground">Registered patients in this clinic</p>
             </CardContent>
           </Card>
-          <Card className="animate-in fade-in-50 slide-in-from-bottom-2 duration-500 delay-200">
+          <Card>
             <CardHeader className="pb-2">
               <CardTitle className="text-sm font-medium">Net Profit After Stock Loss</CardTitle>
             </CardHeader>
@@ -413,7 +455,7 @@ const Dashboard = () => {
         </div>
 
         <div className="grid gap-4 lg:grid-cols-[1.15fr_0.85fr]">
-          <Card className="min-w-0 animate-in fade-in-50 slide-in-from-bottom-2 duration-500">
+          <Card className="min-w-0">
             <CardHeader>
               <CardTitle>Sales Trend</CardTitle>
             </CardHeader>
@@ -453,7 +495,7 @@ const Dashboard = () => {
             </CardContent>
           </Card>
 
-          <Card className="animate-in fade-in-50 slide-in-from-bottom-2 duration-500 delay-100">
+          <Card>
             <CardHeader>
               <CardTitle>Custom Date-Range Report</CardTitle>
             </CardHeader>
@@ -471,13 +513,13 @@ const Dashboard = () => {
               <Button type="button" className="w-full" disabled={customRangeInvalid} onClick={() => setSalesPeriod("custom")}>
                 View Custom Report
               </Button>
-              <div className="rounded-xl border bg-accent/30 p-4 text-sm">
+              <div className="rounded-md border bg-muted/40 p-4 text-sm">
                 <p className="font-medium">Current custom range</p>
                 <p className="mt-1 text-muted-foreground">
                   {customRangeInvalid ? "Choose a valid start and end date." : getCustomRangeLabel(customStartDate, customEndDate)}
                 </p>
                 <p className="mt-3 text-muted-foreground">
-                  Use `Export CSV` while `Custom` is selected to download this exact report.
+                  Use Export CSV while Custom is selected to download this exact report.
                 </p>
               </div>
             </CardContent>
@@ -485,7 +527,7 @@ const Dashboard = () => {
         </div>
 
         <div className="grid gap-4 lg:grid-cols-3">
-          <Card className="animate-in fade-in-50 slide-in-from-bottom-2 duration-500">
+          <Card>
             <CardHeader className="pb-2">
               <CardTitle className="text-sm font-medium">Inventory Cost Value</CardTitle>
             </CardHeader>
@@ -494,7 +536,7 @@ const Dashboard = () => {
               <p className="text-xs text-muted-foreground">Buying price x usable stock left, excluding expired items</p>
             </CardContent>
           </Card>
-          <Card className="animate-in fade-in-50 slide-in-from-bottom-2 duration-500 delay-100">
+          <Card>
             <CardHeader className="pb-2">
               <CardTitle className="text-sm font-medium">Inventory Retail Value</CardTitle>
             </CardHeader>
@@ -503,7 +545,7 @@ const Dashboard = () => {
               <p className="text-xs text-muted-foreground">Selling price x usable stock left, excluding expired items</p>
             </CardContent>
           </Card>
-          <Card className="animate-in fade-in-50 slide-in-from-bottom-2 duration-500 delay-200">
+          <Card>
             <CardHeader className="pb-2">
               <CardTitle className="text-sm font-medium">Estimated Margin In Stock</CardTitle>
             </CardHeader>
@@ -517,7 +559,7 @@ const Dashboard = () => {
         </div>
 
         <div className="grid gap-4 lg:grid-cols-[1.2fr_0.8fr]">
-          <Card className="animate-in fade-in-50 slide-in-from-left-2 duration-500">
+          <Card>
             <CardHeader>
               <CardTitle>How To Read These Numbers</CardTitle>
             </CardHeader>
@@ -549,7 +591,7 @@ const Dashboard = () => {
             </CardContent>
           </Card>
 
-          <Card className="animate-in fade-in-50 slide-in-from-right-2 duration-500">
+          <Card>
             <CardHeader>
               <CardTitle>Inventory Health</CardTitle>
             </CardHeader>
@@ -587,7 +629,7 @@ const Dashboard = () => {
 
         {/* Alerts */}
         {(lowStockDrugs.length > 0 || outOfStockDrugs.length > 0 || expiredDrugs.length > 0 || expiringSoonDrugs.length > 0) && (
-          <Card className="animate-in fade-in-50 slide-in-from-bottom-2 duration-500">
+          <Card>
             <CardHeader>
               <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
                 <CardTitle className="flex items-center gap-2">
@@ -607,7 +649,7 @@ const Dashboard = () => {
                       type="button"
                       size="sm"
                       variant={alertFilter === option.value ? "default" : "outline"}
-                      className="flex-1 transition-transform duration-200 hover:-translate-y-0.5 sm:flex-none"
+                      className="flex-1 sm:flex-none"
                       onClick={() => setAlertFilter(option.value)}
                     >
                       {option.label}
@@ -647,7 +689,7 @@ const Dashboard = () => {
         )}
 
         <div className="grid gap-4 md:grid-cols-3">
-          <Card className="animate-in fade-in-50 slide-in-from-bottom-2 duration-500">
+          <Card>
             <CardHeader className="pb-2">
               <CardTitle className="text-sm font-medium">Sellable Items</CardTitle>
             </CardHeader>
@@ -656,7 +698,7 @@ const Dashboard = () => {
               <p className="text-xs text-muted-foreground">Inventory lines with stock and no expiry block</p>
             </CardContent>
           </Card>
-          <Card className="animate-in fade-in-50 slide-in-from-bottom-2 duration-500 delay-100">
+          <Card>
             <CardHeader className="pb-2">
               <CardTitle className="text-sm font-medium">Expired Items</CardTitle>
             </CardHeader>
@@ -665,7 +707,7 @@ const Dashboard = () => {
               <p className="text-xs text-muted-foreground">Inventory lines that should not be billed</p>
             </CardContent>
           </Card>
-          <Card className="animate-in fade-in-50 slide-in-from-bottom-2 duration-500 delay-200">
+          <Card>
             <CardHeader className="pb-2">
               <CardTitle className="text-sm font-medium">Expiring Soon</CardTitle>
             </CardHeader>
@@ -676,7 +718,7 @@ const Dashboard = () => {
           </Card>
         </div>
 
-        <Card className="animate-in fade-in-50 slide-in-from-bottom-2 duration-500">
+        <Card>
           <CardHeader>
             <CardTitle>Recent Billing Activity</CardTitle>
           </CardHeader>

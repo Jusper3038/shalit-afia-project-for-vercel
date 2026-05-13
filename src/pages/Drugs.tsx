@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { logAudit } from "@/lib/audit";
@@ -13,10 +13,11 @@ import { Badge } from "@/components/ui/badge";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { toast } from "sonner";
-import { Plus, Pencil, Trash2, Download } from "lucide-react";
+import { Plus, Pencil, Trash2, Download, Search, ListPlus } from "lucide-react";
 import type { Tables } from "@/integrations/supabase/types";
 import { getExpiredStockCostLoss, getExpiryLabel, getSellableStockQuantity, isExpiredDrug, isExpiringSoonDrug } from "@/lib/inventory";
 import { readClinicCache, withQueryTimeout, writeClinicCache } from "@/lib/clinic-cache";
+import { DRUG_CATALOG, type DrugCatalogItem } from "@/lib/drug-catalog";
 
 const emptyDrugForm = {
   name: "",
@@ -29,6 +30,29 @@ const emptyDrugForm = {
   low_stock_threshold: "10",
 };
 
+const normalizeSearchText = (value: string) =>
+  value.toLowerCase().trim().replace(/\s+/g, " ");
+const INVENTORY_SUGGESTION_MIN_CHARS = 2;
+const INVENTORY_SUGGESTION_DEBOUNCE_MS = 200;
+
+const getDateSearchTokens = (value: string | null) => {
+  if (!value) return [];
+
+  const tokens = [value, value.replace(/-/g, "/")];
+  const isoDateMatch = value.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+  if (!isoDateMatch) return tokens;
+
+  const [, year, month, day] = isoDateMatch;
+  tokens.push(
+    `${day}-${month}-${year}`,
+    `${month}-${day}-${year}`,
+    `${day}/${month}/${year}`,
+    `${month}/${day}/${year}`
+  );
+
+  return tokens;
+};
+
 type PendingSensitiveAction =
   | { type: "edit"; drug: Tables<"drugs"> }
   | { type: "delete"; drug: Tables<"drugs"> }
@@ -36,7 +60,6 @@ type PendingSensitiveAction =
 
 const DrugsPage = () => {
   const {
-    user,
     clinicOwnerId,
     hasOwnerSecurityPin,
     isSensitiveAccessVerified,
@@ -53,6 +76,13 @@ const DrugsPage = () => {
   const [confirmPin, setConfirmPin] = useState("");
   const [verifyingPin, setVerifyingPin] = useState(false);
   const [pendingSensitiveAction, setPendingSensitiveAction] = useState<PendingSensitiveAction>(null);
+  const [inventorySearch, setInventorySearch] = useState("");
+  const [debouncedInventorySearch, setDebouncedInventorySearch] = useState("");
+  const [catalogSearch, setCatalogSearch] = useState("");
+  const [isInventorySearchFocused, setIsInventorySearchFocused] = useState(false);
+  const [highlightedDrugId, setHighlightedDrugId] = useState<string | null>(null);
+  const inventoryRowRefs = useRef<Record<string, HTMLTableRowElement | null>>({});
+  const highlightTimeoutRef = useRef<number | null>(null);
 
   const fetchDrugs = async () => {
     if (!clinicOwnerId) return;
@@ -83,6 +113,15 @@ const DrugsPage = () => {
     setPendingSensitiveAction(null);
   };
 
+  const openAddDialog = (catalogItem?: DrugCatalogItem) => {
+    setEditingDrug(null);
+    setForm({
+      ...emptyDrugForm,
+      name: catalogItem?.name ?? "",
+    });
+    setDialogOpen(true);
+  };
+
   const openEditDialog = (drug: Tables<"drugs">) => {
     setEditingDrug(drug);
     setForm({
@@ -110,16 +149,59 @@ const DrugsPage = () => {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!clinicOwnerId) return;
+
+    const trimmedName = form.name.trim();
+    const trimmedSerial = form.serial_number.trim();
+    const buyingPrice = Number(form.buying_price);
+    const sellingPrice = Number(form.selling_price);
+    const stockQuantity = Number(form.stock_quantity);
+    const lowStockThreshold = Number(form.low_stock_threshold);
+
+    if (!trimmedName) {
+      toast.error("Drug name is required.");
+      return;
+    }
+
+    if (!Number.isFinite(buyingPrice) || buyingPrice < 0) {
+      toast.error("Buying price must be a valid number greater than or equal to 0.");
+      return;
+    }
+
+    if (!Number.isFinite(sellingPrice) || sellingPrice < 0) {
+      toast.error("Selling price must be a valid number greater than or equal to 0.");
+      return;
+    }
+
+    if (sellingPrice < buyingPrice) {
+      toast.error("Selling price cannot be lower than buying price.");
+      return;
+    }
+
+    if (!Number.isInteger(stockQuantity) || stockQuantity < 0) {
+      toast.error("Stock quantity must be a whole number greater than or equal to 0.");
+      return;
+    }
+
+    if (!Number.isInteger(lowStockThreshold) || lowStockThreshold < 0) {
+      toast.error("Low stock threshold must be a whole number greater than or equal to 0.");
+      return;
+    }
+
+    if (form.expiry_date && form.date_of_purchase && form.date_of_purchase > form.expiry_date) {
+      toast.error("Date of purchase cannot be after expiry date.");
+      return;
+    }
+
     const payload = {
       user_id: clinicOwnerId,
-      name: form.name,
-      serial_number: form.serial_number || null,
+      name: trimmedName,
+      serial_number: trimmedSerial || null,
       expiry_date: form.expiry_date || null,
       date_of_purchase: form.date_of_purchase || null,
-      buying_price: parseFloat(form.buying_price),
-      selling_price: parseFloat(form.selling_price),
-      stock_quantity: parseInt(form.stock_quantity),
-      low_stock_threshold: parseInt(form.low_stock_threshold),
+      buying_price: buyingPrice,
+      selling_price: sellingPrice,
+      stock_quantity: stockQuantity,
+      low_stock_threshold: lowStockThreshold,
     };
 
     if (editingDrug) {
@@ -162,6 +244,71 @@ const DrugsPage = () => {
   const handleDelete = (drug: Tables<"drugs">) => {
     requestSensitiveAction({ type: "delete", drug });
   };
+
+  useEffect(() => {
+    const timeoutId = window.setTimeout(
+      () => setDebouncedInventorySearch(inventorySearch),
+      INVENTORY_SUGGESTION_DEBOUNCE_MS
+    );
+    return () => window.clearTimeout(timeoutId);
+  }, [inventorySearch]);
+
+  const normalizedInventorySearch = normalizeSearchText(debouncedInventorySearch);
+  const inventorySuggestions = useMemo(() => {
+    if (!normalizedInventorySearch || normalizedInventorySearch.length < INVENTORY_SUGGESTION_MIN_CHARS) return [];
+
+    const queryTerms = normalizedInventorySearch.split(" ").filter(Boolean);
+
+    return drugs
+      .filter((drug) => {
+        const searchableText = normalizeSearchText([
+          drug.name,
+          drug.serial_number ?? "",
+          drug.expiry_date ?? "",
+          drug.date_of_purchase ?? "",
+          ...getDateSearchTokens(drug.expiry_date),
+          ...getDateSearchTokens(drug.date_of_purchase),
+        ].join(" "));
+
+        return queryTerms.every((term) => searchableText.includes(term));
+      })
+      .slice(0, 8);
+  }, [drugs, normalizedInventorySearch]);
+
+  const jumpToInventoryDrug = (drug: Tables<"drugs">) => {
+    setInventorySearch(drug.name);
+    setIsInventorySearchFocused(false);
+    setHighlightedDrugId(drug.id);
+
+    if (highlightTimeoutRef.current) {
+      window.clearTimeout(highlightTimeoutRef.current);
+    }
+
+    highlightTimeoutRef.current = window.setTimeout(() => {
+      setHighlightedDrugId(null);
+      highlightTimeoutRef.current = null;
+    }, 2200);
+
+    window.requestAnimationFrame(() => {
+      const row = inventoryRowRefs.current[drug.id];
+      row?.scrollIntoView({ behavior: "smooth", block: "center" });
+    });
+  };
+
+  const normalizedCatalogSearch = catalogSearch.trim().toLowerCase();
+  const catalogMatches = useMemo(() => {
+    if (!normalizedCatalogSearch) return DRUG_CATALOG.slice(0, 8);
+
+    return DRUG_CATALOG.filter((item) => {
+      const haystack = [
+        item.name,
+        item.category,
+        ...item.commonForms,
+      ].join(" ").toLowerCase();
+
+      return haystack.includes(normalizedCatalogSearch);
+    }).slice(0, 12);
+  }, [normalizedCatalogSearch]);
 
   const handleVerifySensitiveAction = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -211,6 +358,14 @@ const DrugsPage = () => {
   const pinSetupInvalid = !hasOwnerSecurityPin && (pin.length < 4 || pin !== confirmPin);
   const sensitiveActionLabel = pendingSensitiveAction?.type === "delete" ? "delete this item" : "edit this item";
 
+  useEffect(() => {
+    return () => {
+      if (highlightTimeoutRef.current) {
+        window.clearTimeout(highlightTimeoutRef.current);
+      }
+    };
+  }, []);
+
   return (
     <AppLayout>
       <div className="space-y-4">
@@ -222,32 +377,122 @@ const DrugsPage = () => {
             </Button>
             <Dialog open={dialogOpen} onOpenChange={(o) => { setDialogOpen(o); if (!o) resetForm(); }}>
               <DialogTrigger asChild>
-                <Button className="w-full sm:w-auto" size="sm"><Plus className="mr-2 h-4 w-4" />Add Item</Button>
+                <Button className="w-full sm:w-auto" size="sm" onClick={() => openAddDialog()}><Plus className="mr-2 h-4 w-4" />Add Item</Button>
               </DialogTrigger>
               <DialogContent className="max-h-[85vh] overflow-y-auto">
                 <DialogHeader>
                   <DialogTitle>{editingDrug ? "Edit Drug" : "Add New Drug"}</DialogTitle>
                 </DialogHeader>
                 <form onSubmit={handleSubmit} className="space-y-4">
-                  <div><Label>Name</Label><Input value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} required /></div>
+                  <div><Label>Name</Label><Input value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} maxLength={120} required /></div>
                   <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
                     <div><Label>Serial Number</Label><Input value={form.serial_number} onChange={(e) => setForm({ ...form, serial_number: e.target.value })} placeholder="Optional batch or serial" /></div>
                     <div><Label>Expiry Date</Label><Input type="date" value={form.expiry_date} onChange={(e) => setForm({ ...form, expiry_date: e.target.value })} /></div>
                   </div>
                   <div><Label>Date of Purchase</Label><Input type="date" value={form.date_of_purchase} onChange={(e) => setForm({ ...form, date_of_purchase: e.target.value })} /></div>
                   <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-                    <div><Label>Buying Price (KSh)</Label><Input type="number" step="0.01" value={form.buying_price} onChange={(e) => setForm({ ...form, buying_price: e.target.value })} required /></div>
-                    <div><Label>Selling Price (KSh)</Label><Input type="number" step="0.01" value={form.selling_price} onChange={(e) => setForm({ ...form, selling_price: e.target.value })} required /></div>
+                    <div><Label>Buying Price (KSh)</Label><Input type="number" step="0.01" min="0" value={form.buying_price} onChange={(e) => setForm({ ...form, buying_price: e.target.value })} required /></div>
+                    <div><Label>Selling Price (KSh)</Label><Input type="number" step="0.01" min="0" value={form.selling_price} onChange={(e) => setForm({ ...form, selling_price: e.target.value })} required /></div>
                   </div>
                   <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-                    <div><Label>Stock Quantity</Label><Input type="number" value={form.stock_quantity} onChange={(e) => setForm({ ...form, stock_quantity: e.target.value })} required /></div>
-                    <div><Label>Low Stock Threshold</Label><Input type="number" value={form.low_stock_threshold} onChange={(e) => setForm({ ...form, low_stock_threshold: e.target.value })} required /></div>
+                    <div><Label>Stock Quantity</Label><Input type="number" step="1" min="0" value={form.stock_quantity} onChange={(e) => setForm({ ...form, stock_quantity: e.target.value })} required /></div>
+                    <div><Label>Low Stock Threshold</Label><Input type="number" step="1" min="0" value={form.low_stock_threshold} onChange={(e) => setForm({ ...form, low_stock_threshold: e.target.value })} required /></div>
                   </div>
                   <Button type="submit" className="w-full">{editingDrug ? "Update" : "Add"} Drug</Button>
                 </form>
               </DialogContent>
             </Dialog>
           </div>
+        </div>
+
+        <div className="grid gap-4 xl:grid-cols-[0.95fr_1.05fr]">
+          <Card>
+            <CardHeader className="pb-3">
+              <CardTitle className="flex items-center gap-2 text-base">
+                <Search className="h-4 w-4" />
+                Find Inventory Item
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-3">
+              <div className="relative">
+                <Input
+                  value={inventorySearch}
+                  onFocus={() => setIsInventorySearchFocused(true)}
+                  onBlur={() => window.setTimeout(() => setIsInventorySearchFocused(false), 120)}
+                  onChange={(e) => setInventorySearch(e.target.value)}
+                  placeholder="Search stock by drug name, batch, or date"
+                />
+                {isInventorySearchFocused && inventorySearch.trim() && (
+                  <div className="absolute z-20 mt-2 max-h-64 w-full overflow-y-auto rounded-md border bg-background shadow-md">
+                    {normalizedInventorySearch.length < INVENTORY_SUGGESTION_MIN_CHARS ? (
+                      <p className="px-3 py-2 text-sm text-muted-foreground">
+                        Type at least {INVENTORY_SUGGESTION_MIN_CHARS} characters to see suggestions.
+                      </p>
+                    ) : inventorySuggestions.length === 0 ? (
+                      <p className="px-3 py-2 text-sm text-muted-foreground">No matching inventory suggestions.</p>
+                    ) : (
+                      inventorySuggestions.map((drug) => (
+                        <button
+                          key={drug.id}
+                          type="button"
+                          onClick={() => jumpToInventoryDrug(drug)}
+                          className="block w-full border-b px-3 py-2 text-left transition last:border-b-0 hover:bg-accent/50"
+                        >
+                          <p className="truncate text-sm font-medium">{drug.name}</p>
+                          <p className="truncate text-xs text-muted-foreground">
+                            {drug.serial_number || "No serial"} | Expiry: {formatDate(drug.expiry_date)} | Stock: {drug.stock_quantity}
+                          </p>
+                        </button>
+                      ))
+                    )}
+                  </div>
+                )}
+              </div>
+              <p className="text-xs text-muted-foreground">
+                Suggestions help you jump directly to an item row. The full inventory list below stays unchanged.
+              </p>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader className="pb-3">
+              <CardTitle className="flex items-center gap-2 text-base">
+                <ListPlus className="h-4 w-4" />
+                Drug Catalog Helper
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-3">
+              <Input
+                value={catalogSearch}
+                onChange={(e) => setCatalogSearch(e.target.value)}
+                placeholder="Search a drug name to prefill a new stock item"
+              />
+              <div className="grid gap-2 sm:grid-cols-2">
+                {catalogMatches.map((item) => (
+                  <button
+                    key={item.name}
+                    type="button"
+                    onClick={() => openAddDialog(item)}
+                    className="rounded-md border bg-background p-3 text-left transition hover:border-primary/40 hover:bg-accent/40"
+                  >
+                    <div className="flex items-start justify-between gap-2">
+                      <div className="min-w-0">
+                        <p className="truncate text-sm font-semibold">{item.name}</p>
+                        <p className="mt-1 truncate text-xs text-muted-foreground">{item.category}</p>
+                      </div>
+                      <Plus className="h-4 w-4 shrink-0 text-primary" />
+                    </div>
+                    <p className="mt-2 line-clamp-1 text-xs text-muted-foreground">
+                      {item.commonForms.join(", ")}
+                    </p>
+                  </button>
+                ))}
+              </div>
+              <p className="text-xs text-muted-foreground">
+                Catalog picks do not become inventory until you save them with stock, purchase, and selling details.
+              </p>
+            </CardContent>
+          </Card>
         </div>
 
         <Card>
@@ -274,7 +519,13 @@ const DrugsPage = () => {
                 </TableHeader>
                 <TableBody>
                   {drugs.map((d) => (
-                    <TableRow key={d.id}>
+                    <TableRow
+                      key={d.id}
+                      ref={(row) => {
+                        inventoryRowRefs.current[d.id] = row;
+                      }}
+                      className={highlightedDrugId === d.id ? "bg-accent/50 transition-colors" : undefined}
+                    >
                       <TableCell className="font-medium">{d.name}</TableCell>
                       <TableCell>{d.serial_number || "-"}</TableCell>
                       <TableCell>{formatDate(d.expiry_date)}</TableCell>

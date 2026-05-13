@@ -83,6 +83,48 @@ export type Database = {
         }
         Relationships: []
       }
+      ecommerce_stores: {
+        Row: { id: string; owner_user_id: string; slug: string; store_name: string; status: string; logo_url: string | null; brand_color: string; contact_phone: string; whatsapp_number: string; email: string; location: string; currency: string; created_at: string; updated_at: string }
+        Insert: { id?: string; owner_user_id: string; slug: string; store_name: string; status?: string; logo_url?: string | null; brand_color?: string; contact_phone?: string; whatsapp_number?: string; email?: string; location?: string; currency?: string; created_at?: string; updated_at?: string }
+        Update: { id?: string; owner_user_id?: string; slug?: string; store_name?: string; status?: string; logo_url?: string | null; brand_color?: string; contact_phone?: string; whatsapp_number?: string; email?: string; location?: string; currency?: string; created_at?: string; updated_at?: string }
+        Relationships: []
+      }
+      ecommerce_store_domains: {
+        Row: { id: string; store_id: string; hostname: string; domain_type: string; status: string; verification_token: string; verified_at: string | null; created_at: string }
+        Insert: { id?: string; store_id: string; hostname: string; domain_type?: string; status?: string; verification_token?: string; verified_at?: string | null; created_at?: string }
+        Update: { id?: string; store_id?: string; hostname?: string; domain_type?: string; status?: string; verification_token?: string; verified_at?: string | null; created_at?: string }
+        Relationships: []
+      }
+      ecommerce_product_categories: {
+        Row: { id: string; store_id: string; name: string; slug: string; sort_order: number; is_active: boolean; created_at: string; updated_at: string }
+        Insert: { id?: string; store_id: string; name: string; slug: string; sort_order?: number; is_active?: boolean; created_at?: string; updated_at?: string }
+        Update: { id?: string; store_id?: string; name?: string; slug?: string; sort_order?: number; is_active?: boolean; created_at?: string; updated_at?: string }
+        Relationships: []
+      }
+      ecommerce_products: {
+        Row: { id: string; store_id: string; category_id: string | null; inventory_drug_id: string | null; name: string; slug: string; description: string; image_url: string | null; price: number; compare_at_price: number | null; stock_quantity: number; track_inventory: boolean; is_active: boolean; metadata: Json; created_at: string; updated_at: string }
+        Insert: { id?: string; store_id: string; category_id?: string | null; inventory_drug_id?: string | null; name: string; slug: string; description?: string; image_url?: string | null; price?: number; compare_at_price?: number | null; stock_quantity?: number; track_inventory?: boolean; is_active?: boolean; metadata?: Json; created_at?: string; updated_at?: string }
+        Update: { id?: string; store_id?: string; category_id?: string | null; inventory_drug_id?: string | null; name?: string; slug?: string; description?: string; image_url?: string | null; price?: number; compare_at_price?: number | null; stock_quantity?: number; track_inventory?: boolean; is_active?: boolean; metadata?: Json; created_at?: string; updated_at?: string }
+        Relationships: []
+      }
+      ecommerce_customers: {
+        Row: { id: string; store_id: string; name: string; phone: string; email: string; created_at: string; updated_at: string }
+        Insert: { id?: string; store_id: string; name: string; phone: string; email?: string; created_at?: string; updated_at?: string }
+        Update: { id?: string; store_id?: string; name?: string; phone?: string; email?: string; created_at?: string; updated_at?: string }
+        Relationships: []
+      }
+      ecommerce_orders: {
+        Row: { id: string; store_id: string; customer_id: string | null; order_number: string; customer_name: string; customer_phone: string; customer_email: string; delivery_method: string; delivery_address: string; status: string; payment_method: string; payment_status: string; subtotal: number; delivery_fee: number; total_amount: number; notes: string; stock_deducted_at: string | null; dashboard_recorded_at: string | null; created_at: string; updated_at: string }
+        Insert: { id?: string; store_id: string; customer_id?: string | null; order_number: string; customer_name: string; customer_phone: string; customer_email?: string; delivery_method?: string; delivery_address?: string; status?: string; payment_method?: string; payment_status?: string; subtotal?: number; delivery_fee?: number; total_amount?: number; notes?: string; stock_deducted_at?: string | null; dashboard_recorded_at?: string | null; created_at?: string; updated_at?: string }
+        Update: { id?: string; store_id?: string; customer_id?: string | null; order_number?: string; customer_name?: string; customer_phone?: string; customer_email?: string; delivery_method?: string; delivery_address?: string; status?: string; payment_method?: string; payment_status?: string; subtotal?: number; delivery_fee?: number; total_amount?: number; notes?: string; stock_deducted_at?: string | null; dashboard_recorded_at?: string | null; created_at?: string; updated_at?: string }
+        Relationships: []
+      }
+      ecommerce_order_items: {
+        Row: { id: string; order_id: string; product_id: string | null; product_name: string; quantity: number; unit_price: number; total_price: number; created_at: string }
+        Insert: { id?: string; order_id: string; product_id?: string | null; product_name: string; quantity: number; unit_price: number; total_price: number; created_at?: string }
+        Update: { id?: string; order_id?: string; product_id?: string | null; product_name?: string; quantity?: number; unit_price?: number; total_price?: number; created_at?: string }
+        Relationships: []
+      }
       leads: {
         Row: {
           clinic_name: string
@@ -406,6 +448,36 @@ export type Database = {
           updated_at: string
           user_id: string
         }[]
+      }
+      can_manage_ecommerce_store: {
+        Args: {
+          p_store_id: string
+        }
+        Returns: boolean
+      }
+      resolve_ecommerce_store_by_slug: {
+        Args: {
+          p_slug: string
+        }
+        Returns: Database["public"]["Tables"]["ecommerce_stores"]["Row"][]
+      }
+      resolve_ecommerce_store_by_hostname: {
+        Args: {
+          p_hostname: string
+        }
+        Returns: Database["public"]["Tables"]["ecommerce_stores"]["Row"][]
+      }
+      is_published_ecommerce_order: {
+        Args: {
+          p_order_id: string
+        }
+        Returns: boolean
+      }
+      complete_ecommerce_order: {
+        Args: {
+          p_order_id: string
+        }
+        Returns: Database["public"]["Tables"]["ecommerce_orders"]["Row"]
       }
       has_role: {
         Args: {

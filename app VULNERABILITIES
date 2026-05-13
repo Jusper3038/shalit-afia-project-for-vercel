@@ -1,0 +1,223 @@
+# SHALIT AFIA App Vulnerabilities
+
+Security review date: 2026-05-13
+
+Scope reviewed:
+- React/Vite frontend code
+- Supabase client usage
+- Supabase migrations, policies, and RPC functions
+- Supabase Edge Functions
+- Vercel API routes
+- Dependency audit with `npm audit --audit-level=low`
+
+Dependency audit result:
+- `npm audit --audit-level=low` reported 0 known dependency vulnerabilities.
+
+## High Risk
+
+### 1. M-Pesa STK function trusts client-supplied `user_id` while using service role
+
+File:
+- `supabase/functions/mpesa-stk-push/index.ts`
+
+Relevant code:
+- Line 13 accepts `phone`, `amount`, and `user_id` from the request body.
+- Lines 88-90 create a Supabase client with `SUPABASE_SERVICE_ROLE_KEY`.
+- Lines 93-100 insert a payment using the client-supplied `user_id`.
+
+Why this is dangerous:
+- The service role bypasses Row Level Security.
+- A caller can submit another clinic/account `user_id`.
+- This can create payment records under the wrong clinic and trigger STK pushes without a trusted server-side ownership check.
+
+Recommended fix:
+- Verify the caller's Supabase JWT.
+- Derive the user/clinic owner ID from the authenticated session, not from the request body.
+- Check that the caller can access the target clinic.
+- Never trust `user_id` sent by the browser for privileged inserts.
+
+### 2. M-Pesa callback can be spoofed
+
+File:
+- `supabase/functions/mpesa-callback/index.ts`
+
+Relevant code:
+- Line 18 accepts arbitrary JSON callback data.
+- Lines 27-29 create a Supabase service-role client.
+- Lines 40-52 update payment status based only on the submitted `CheckoutRequestID` and `ResultCode`.
+
+Why this is dangerous:
+- There is no signature verification, source validation, shared secret, or callback authenticity check.
+- Anyone who can reach the callback endpoint and knows or guesses a checkout request ID could mark payments as completed or failed.
+
+Recommended fix:
+- Verify Safaricom callback authenticity.
+- Correlate callback data with stored pending payment details.
+- Validate amount, phone number, merchant request ID, and checkout request ID.
+- Consider using a callback secret or allowlisted network/source validation where supported.
+
+### 3. Public ecommerce orders can be forged with client-controlled prices
+
+Files:
+- `src/pages/Storefront.tsx`
+- `supabase/migrations/20260511133000_add_multitenant_ecommerce_foundation.sql`
+
+Relevant code:
+- `src/pages/Storefront.tsx` lines 301-316 insert order totals from the browser.
+- `src/pages/Storefront.tsx` lines 324-332 insert item `unit_price` and `total_price` from the browser.
+- Migration lines 374-384 allow public order creation for published stores.
+- Migration lines 406-410 allow public order item creation for published orders.
+
+Why this is dangerous:
+- A malicious user can bypass the UI and submit lower prices, fake totals, or manipulated delivery fees.
+- The database currently trusts browser-calculated money values.
+
+Recommended fix:
+- Do not insert public ecommerce orders directly from the browser.
+- Create a server-side RPC or Edge Function that accepts only product IDs and quantities.
+- Recalculate prices, totals, delivery fees, and availability server-side.
+- Reject mismatched or stale cart data.
+
+### 4. Cross-store ecommerce stock tampering risk
+
+Status: Fixed in `supabase/migrations/20260513153000_harden_ecommerce_order_item_store_scope.sql`.
+
+Files:
+- `supabase/migrations/20260511133000_add_multitenant_ecommerce_foundation.sql`
+- `supabase/migrations/20260513143000_complete_ecommerce_orders_into_dashboard.sql`
+- `supabase/migrations/20260513153000_harden_ecommerce_order_item_store_scope.sql`
+
+Relevant code:
+- Public order item insert policy only checks that the order is published.
+- `complete_ecommerce_order` lines 63-67 loads an ecommerce product by ID.
+- Lines 74-77 deduct stock from that product.
+
+Why this is dangerous:
+- A malicious order could reference a product ID from another store.
+- When the order is completed, the function can deduct stock from the referenced product even if it belongs to a different store.
+
+Recommended fix:
+- In the order item insert policy, require the product to belong to the same store as the order.
+- In `complete_ecommerce_order`, enforce `v_product.store_id = v_order.store_id`.
+- Reject order items where `product_id` does not belong to the order's store.
+
+Implemented fix:
+- Replaced the public `ecommerce_order_items` insert policy so a non-null `product_id` must belong to the same store as the target order.
+- Updated `complete_ecommerce_order` so completion fails if an order item references a product from a different store.
+- Scoped ecommerce product stock deduction with `store_id = v_order.store_id`.
+
+## Medium Risk
+
+### 5. AI API routes are unauthenticated and can burn API quota
+
+Files:
+- `api/gemini.ts`
+- `api/ollama.ts`
+
+Relevant code:
+- `api/gemini.ts` accepts public POST requests.
+- `api/ollama.ts` accepts public POST requests.
+- The frontend calls these from `src/components/ClinicAssistant.tsx`.
+
+Why this is dangerous:
+- Anyone can call the deployed API endpoints directly.
+- This can burn Gemini quota or overload the Ollama backend.
+- Request bodies are not strongly size-limited.
+
+Recommended fix:
+- Require a valid Supabase session/JWT.
+- Rate limit by user and IP.
+- Add request body size limits.
+- Consider server-side checks that the caller is an active clinic member.
+
+### 6. Receipt printing has stored XSS risk
+
+File:
+- `src/pages/Billing.tsx`
+
+Relevant code:
+- Lines 351-390 build raw HTML using receipt, patient, drug, and serial number values.
+- Line 408 writes the generated HTML with `document.write`.
+
+Why this is dangerous:
+- Patient names, drug names, clinic names, or serial numbers may contain HTML/script payloads.
+- If malicious content is stored and later printed, it could execute in the browser.
+- Because Supabase auth persists in `localStorage`, XSS could expose session tokens.
+
+Recommended fix:
+- Escape all interpolated HTML values.
+- Prefer rendering receipt content with React text nodes instead of raw HTML strings.
+- Avoid `document.write` for untrusted content.
+
+### 7. Platform owner can be claimed by the first authenticated user
+
+File:
+- `supabase/migrations/20260423170000_add_platform_owner_account_management.sql`
+
+Relevant code:
+- `claim_platform_owner_access` lets any authenticated user claim platform ownership if `platform_owners` is empty.
+
+Why this is dangerous:
+- On a fresh deployment with open registration, the first authenticated user could become platform owner.
+- Platform owner functions can view and manage all accounts.
+
+Recommended fix:
+- Seed the platform owner manually during deployment.
+- Restrict claim by allowlisted email.
+- Require a one-time bootstrap secret.
+- Disable public owner claiming after setup.
+
+### 8. Owner security PIN is short and has no rate limiting
+
+Files:
+- `supabase/migrations/20260415013000_add_owner_security_pin.sql`
+- `supabase/migrations/20260415020500_require_old_pin_for_pin_change.sql`
+
+Relevant code:
+- PIN format is 4 to 6 digits.
+- `verify_owner_security_pin` checks the PIN but does not track failed attempts.
+
+Why this is dangerous:
+- A stolen admin session, XSS, or automated RPC calls could brute force the PIN.
+- A 4-digit PIN has only 10,000 combinations.
+
+Recommended fix:
+- Add failed-attempt tracking.
+- Add cooldown/lockout after repeated failures.
+- Consider requiring password re-authentication or MFA for sensitive actions.
+- Use longer secrets or recovery codes for high-impact actions.
+
+## Other Notes
+
+### Supabase session persistence
+
+File:
+- `src/integrations/supabase/client.ts`
+
+Relevant code:
+- Supabase auth uses `localStorage`.
+
+Risk:
+- This is common in browser apps, but it increases the impact of any XSS vulnerability because session tokens may be accessible to malicious JavaScript.
+
+Recommended fix:
+- Fix XSS paths first.
+- Consider whether session persistence can be reduced for sensitive deployments.
+- Add Content Security Policy headers.
+
+### Environment handling
+
+Observation:
+- `.env` is listed in `.gitignore`, which is good.
+- Secret values were not printed during review.
+
+## Priority Fix Order
+
+1. Lock down `mpesa-stk-push` authentication and remove trusted client `user_id`.
+2. Add callback verification/correlation for `mpesa-callback`.
+3. Move ecommerce order creation to a server-side RPC/Edge Function that recalculates prices.
+4. Enforce same-store product checks for ecommerce order items and completion.
+5. Require auth and rate limits for `/api/gemini` and `/api/ollama`.
+6. Escape or safely render receipt HTML.
+7. Restrict platform owner bootstrap.
+8. Add owner PIN rate limiting and lockout.
