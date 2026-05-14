@@ -30,3 +30,4 @@ supabase/.temp/
 *.sw?
 
 .vercel
+vite.config.ts.timestamp-*.mjs

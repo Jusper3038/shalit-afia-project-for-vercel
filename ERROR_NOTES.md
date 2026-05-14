@@ -263,3 +263,42 @@ git config --global --add safe.directory "D:/4.3 NEW/4.2 NEW/LEVEL 4.2/LEVEL 3/s
 **Status:**  
 Documented. Build verification and code patching proceeded without requiring git status/diff.
 
+---
+
+### 6. **Git Push Failed: GitHub Permission Denied (403)**
+
+**Error Message:**
+```text
+remote: Permission to Jusper3038/shalit-afia-project-for-vercel.git denied to jusperotina-ASUMWA.
+fatal: unable to access 'https://github.com/Jusper3038/shalit-afia-project-for-vercel.git/': The requested URL returned error: 403
+```
+
+**When It Happened:**  
+Trying to push local commit `ee45167` to `origin/main` on May 13, 2026.
+
+**Root Cause:**  
+The currently authenticated GitHub identity does not have write access to this repository.
+
+**Solution (Recommended):**
+1. Confirm remote URL:
+```powershell
+git remote -v
+```
+2. Re-authenticate with the GitHub account that owns the repo (or has collaborator write access).  
+   - In Git Credential Manager, sign out the wrong account and sign in with the correct one.
+3. If using HTTPS token auth, use a PAT from the correct account with repo write permission.
+4. Push again:
+```powershell
+git push origin main
+```
+
+**Optional Fast Check:**
+```powershell
+git config user.name
+git config user.email
+```
+These should match the account expected to push to `Jusper3038/shalit-afia-project-for-vercel`.
+
+**Status:**  
+Local commit succeeded; remote push blocked only by account permissions.
+
