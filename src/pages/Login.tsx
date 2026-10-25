@@ -87,6 +87,11 @@ const Login = () => {
               {loading ? "Signing in..." : "Sign In"}
             </Button>
           </form>
+          <div className="mt-3 text-center text-sm">
+            <Link to="/reset-password" className="text-primary underline">
+              Forgot password?
+            </Link>
+          </div>
           <div className="mt-4 text-center text-sm text-muted-foreground">
             Don't have an account?{" "}
             <Link to="/register" className="text-primary underline">

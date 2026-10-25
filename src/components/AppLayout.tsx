@@ -32,7 +32,7 @@ const navItems = [
   { to: "/home", label: "Home", icon: Home, ownerOnly: false },
   { to: "/ecommerce", label: "Ecommerce", icon: ShoppingBag, ownerOnly: true, release: "ecommerce" as ReleasedAppKey },
   { to: "/payments", label: "Payments", icon: CreditCard, ownerOnly: false, app: "payments" as AppPermission, release: "payments" as ReleasedAppKey },
-  { to: "/users", label: "Platform Accounts", icon: Users, ownerOnly: false, platformOnly: true },
+  { to: "/users", label: "System Accounts", icon: Users, ownerOnly: false, platformOnly: true },
   { to: "/audit-logs", label: "Audit Logs", icon: ScrollText, ownerOnly: false, app: "audit_logs" as AppPermission, release: "audit_logs" as ReleasedAppKey },
   { to: "/settings", label: "Settings", icon: Settings, ownerOnly: false, app: "settings" as AppPermission, release: "settings" as ReleasedAppKey },
 ];
@@ -66,7 +66,7 @@ const AppLayout = ({ children }: { children: React.ReactNode }) => {
   });
   const isPharmacyRoute = location.pathname.startsWith("/pharmacy");
   const selectedPharmacyModule = visiblePharmacyNavItems.some((item) => item.to === location.pathname);
-  const displayRole = isPlatformOwner ? "Platform owner" : role === "admin" ? "Clinic owner" : "Team member";
+  const displayRole = isPlatformOwner ? "System Owner" : role === "admin" ? "Clinic Owner" : "Team Member";
 
   const clearIdleCollapseTimer = useCallback(() => {
     if (idleCollapseTimeoutRef.current) {

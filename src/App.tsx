@@ -10,6 +10,7 @@ import ProtectedRoute from "@/components/ProtectedRoute";
 const Index = lazy(() => import("./pages/Index"));
 const Login = lazy(() => import("./pages/Login"));
 const Register = lazy(() => import("./pages/Register"));
+const ResetPassword = lazy(() => import("./pages/ResetPassword"));
 const PharmacyPage = lazy(() => import("./pages/Pharmacy"));
 const Dashboard = lazy(() => import("./pages/Dashboard"));
 const DrugsPage = lazy(() => import("./pages/Drugs"));
@@ -47,6 +48,7 @@ const App = () => (
               <Route path="/home" element={<Index keepLandingVisible />} />
               <Route path="/login" element={<Login />} />
               <Route path="/register" element={<Register />} />
+              <Route path="/reset-password" element={<ResetPassword />} />
               <Route path="/shop" element={<StorefrontPage />} />
               <Route path="/store/:storeSlug" element={<StorefrontPage />} />
               <Route path="/pharmacy" element={<ProtectedRoute><PharmacyPage /></ProtectedRoute>} />

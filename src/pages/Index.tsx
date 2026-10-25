@@ -219,7 +219,7 @@ const launcherApps: LauncherApp[] = [
     releaseKey: "settings",
   },
   {
-    title: "Platform Accounts",
+    title: "System Accounts",
     description: "Manage owner-level accounts",
     to: "/users",
     icon: Users,
