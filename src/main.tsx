@@ -1,11 +1,12 @@
 import { createRoot } from "react-dom/client";
 import { createElement } from "react";
 import "./index.css";
+import { SUPABASE_PUBLISHABLE_KEY, SUPABASE_URL } from "@/lib/supabase-config";
 
 const root = createRoot(document.getElementById("root")!);
 const missingSupabaseSettings = [
-  ["VITE_SUPABASE_URL", import.meta.env.VITE_SUPABASE_URL],
-  ["VITE_SUPABASE_PUBLISHABLE_KEY", import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY],
+  ["VITE_SUPABASE_URL", SUPABASE_URL],
+  ["VITE_SUPABASE_PUBLISHABLE_KEY", SUPABASE_PUBLISHABLE_KEY],
 ].filter(([, value]) => !value);
 
 if (missingSupabaseSettings.length > 0) {
