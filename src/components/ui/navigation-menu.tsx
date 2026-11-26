@@ -107,6 +107,8 @@ const NavigationMenuIndicator = React.forwardRef<
 ));
 NavigationMenuIndicator.displayName = NavigationMenuPrimitive.Indicator.displayName;
 
+// The styling helper is part of the public primitive API and is not a component.
+/* eslint-disable react-refresh/only-export-components */
 export {
   navigationMenuTriggerStyle,
   NavigationMenu,
@@ -118,3 +120,4 @@ export {
   NavigationMenuIndicator,
   NavigationMenuViewport,
 };
+/* eslint-enable react-refresh/only-export-components */

@@ -26,4 +26,6 @@ function Badge({ className, variant, ...props }: BadgeProps) {
   return <div className={cn(badgeVariants({ variant }), className)} {...props} />;
 }
 
+// The variants helper is part of the public primitive API and is not a component.
+// eslint-disable-next-line react-refresh/only-export-components
 export { Badge, badgeVariants };

@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { logAudit } from "@/lib/audit";
@@ -78,7 +78,7 @@ const BillingPage = () => {
     String(profile?.minimum_profit_retention_percentage ?? 0)
   );
 
-  const fetchAll = async () => {
+  const fetchAll = useCallback(async () => {
     if (!clinicOwnerId) return;
     const cached = readClinicCache<{
       patients: Tables<"patients">[];
@@ -111,9 +111,9 @@ const BillingPage = () => {
     setTransactions(nextData.transactions);
     writeClinicCache(clinicOwnerId, "billing", nextData);
     setLoading(false);
-  };
+  }, [clinicOwnerId]);
 
-  useEffect(() => { fetchAll(); }, [clinicOwnerId]);
+  useEffect(() => { void fetchAll(); }, [fetchAll]);
   useEffect(() => {
     setMaximumDiscountPercentage(String(profile?.minimum_profit_retention_percentage ?? 0));
   }, [profile?.minimum_profit_retention_percentage]);

@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -9,7 +9,8 @@ import { Badge } from "@/components/ui/badge";
 import { toast } from "sonner";
 import { Copy, Plus, XCircle } from "lucide-react";
 import { APP_PERMISSION_OPTIONS, type AppPermission } from "@/lib/app-permissions";
-import PhoneNumberInput, { normalizePhoneNumber } from "@/components/PhoneNumberInput";
+import PhoneNumberInput from "@/components/PhoneNumberInput";
+import { normalizePhoneNumber } from "@/lib/phone";
 import { readClinicCache, withQueryTimeout, writeClinicCache } from "@/lib/clinic-cache";
 import { useAuth } from "@/contexts/AuthContext";
 
@@ -43,7 +44,7 @@ const TeamUsersSettings = () => {
     [invites]
   );
 
-  const fetchInvites = async () => {
+  const fetchInvites = useCallback(async () => {
     const cached = readClinicCache<ClinicInvite[]>(clinicOwnerId, "clinic_invites");
     if (cached) {
       setInvites(cached);
@@ -65,11 +66,11 @@ const TeamUsersSettings = () => {
     const nextInvites = (data ?? []) as ClinicInvite[];
     setInvites(nextInvites);
     writeClinicCache(clinicOwnerId, "clinic_invites", nextInvites);
-  };
+  }, [clinicOwnerId]);
 
   useEffect(() => {
     void fetchInvites();
-  }, []);
+  }, [fetchInvites]);
 
   const toggleSelectedApp = (permission: AppPermission) => {
     setSelectedApps((current) =>

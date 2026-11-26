@@ -320,6 +320,30 @@ export type Database = {
         }
         Relationships: []
       }
+      platform_app_releases: {
+        Row: {
+          app_key: string
+          created_at: string
+          is_enabled: boolean
+          updated_at: string
+          updated_by: string | null
+        }
+        Insert: {
+          app_key: string
+          created_at?: string
+          is_enabled?: boolean
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Update: {
+          app_key?: string
+          created_at?: string
+          is_enabled?: boolean
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Relationships: []
+      }
       profiles: {
         Row: {
           clinic_name: string

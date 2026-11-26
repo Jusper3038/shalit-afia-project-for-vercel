@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { logAudit } from "@/lib/audit";
@@ -11,7 +11,8 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { toast } from "sonner";
 import { Phone, RefreshCw } from "lucide-react";
 import type { Tables } from "@/integrations/supabase/types";
-import PhoneNumberInput, { normalizePhoneNumber } from "@/components/PhoneNumberInput";
+import PhoneNumberInput from "@/components/PhoneNumberInput";
+import { normalizePhoneNumber } from "@/lib/phone";
 import { readClinicCache, withQueryTimeout, writeClinicCache } from "@/lib/clinic-cache";
 
 const getErrorMessage = (error: unknown) => error instanceof Error ? error.message : "Failed to initiate M-Pesa payment";
@@ -25,7 +26,7 @@ const PaymentsPage = () => {
   const [amount, setAmount] = useState("");
   const [submitting, setSubmitting] = useState(false);
 
-  const fetchPayments = async () => {
+  const fetchPayments = useCallback(async () => {
     if (!clinicOwnerId) return;
     const cached = readClinicCache<Tables<"payments">[]>(clinicOwnerId, "payments");
     if (cached) {
@@ -44,11 +45,11 @@ const PaymentsPage = () => {
     setPayments(data ?? []);
     writeClinicCache(clinicOwnerId, "payments", data ?? []);
     setLoading(false);
-  };
+  }, [clinicOwnerId]);
 
   useEffect(() => {
-    fetchPayments();
-  }, [clinicOwnerId]);
+    void fetchPayments();
+  }, [fetchPayments]);
 
   const handleMpesaPay = async (e: React.FormEvent) => {
     e.preventDefault();

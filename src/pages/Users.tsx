@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { logAudit } from "@/lib/audit";
 import { useAuth } from "@/contexts/AuthContext";
@@ -42,7 +42,7 @@ const UsersPage = () => {
   const [deletingUserId, setDeletingUserId] = useState<string | null>(null);
   const [updatingStatusUserId, setUpdatingStatusUserId] = useState<string | null>(null);
 
-  const fetchUsers = async () => {
+  const fetchUsers = useCallback(async () => {
     const cached = readClinicCache<SystemUser[]>(user?.id ?? null, "platform_users");
     if (cached) {
       setUsers(cached);
@@ -64,9 +64,9 @@ const UsersPage = () => {
     const nextUsers = (data ?? []) as SystemUser[];
     setUsers(nextUsers);
     writeClinicCache(user?.id ?? null, "platform_users", nextUsers);
-  };
+  }, [user?.id]);
 
-  const fetchLeads = async () => {
+  const fetchLeads = useCallback(async () => {
     const cached = readClinicCache<LeadRow[]>(user?.id ?? null, "platform_leads");
     if (cached) {
       setLeads(cached);
@@ -92,7 +92,7 @@ const UsersPage = () => {
     const nextLeads = (data ?? []) as LeadRow[];
     setLeads(nextLeads);
     writeClinicCache(user?.id ?? null, "platform_leads", nextLeads);
-  };
+  }, [user?.id]);
 
   useEffect(() => {
     setDraftReleasedApps(releasedApps);
@@ -107,7 +107,7 @@ const UsersPage = () => {
 
     void fetchUsers();
     void fetchLeads();
-  }, [isPlatformOwner]);
+  }, [fetchLeads, fetchUsers, isPlatformOwner]);
 
   const handleToggleReleasedApp = (app: ReleasedAppKey) => {
     setDraftReleasedApps((current) =>
@@ -126,7 +126,7 @@ const UsersPage = () => {
       updated_at: new Date().toISOString(),
     }));
 
-    const { error } = await (supabase as any)
+    const { error } = await supabase
       .from("platform_app_releases")
       .upsert(rows, { onConflict: "app_key" });
     setSavingReleases(false);

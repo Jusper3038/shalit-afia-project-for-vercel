@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import AppLayout from "@/components/AppLayout";
-import PhoneNumberInput, { COUNTRY_CODES, normalizePhoneNumber } from "@/components/PhoneNumberInput";
+import PhoneNumberInput from "@/components/PhoneNumberInput";
+import { COUNTRY_CODES, normalizePhoneNumber } from "@/lib/phone";
 import TeamUsersSettings from "@/components/TeamUsersSettings";
 import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/integrations/supabase/client";

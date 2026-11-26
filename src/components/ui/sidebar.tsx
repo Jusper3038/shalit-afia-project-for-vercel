@@ -609,6 +609,8 @@ const SidebarMenuSubButton = React.forwardRef<
 });
 SidebarMenuSubButton.displayName = "SidebarMenuSubButton";
 
+// useSidebar is intentionally exported beside the sidebar component family.
+/* eslint-disable react-refresh/only-export-components */
 export {
   Sidebar,
   SidebarContent,
@@ -635,3 +637,4 @@ export {
   SidebarTrigger,
   useSidebar,
 };
+/* eslint-enable react-refresh/only-export-components */

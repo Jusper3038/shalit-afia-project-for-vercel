@@ -17,6 +17,7 @@ const Login = () => {
   const navigate = useNavigate();
   const location = useLocation();
   const redirectPath = (location.state as { from?: string } | null)?.from ?? "/home";
+  const inviteAccepted = searchParams.get("invite") === "accepted";
 
   useEffect(() => {
     const blockedMessage = sessionStorage.getItem("auth_blocked_message");
@@ -25,10 +26,10 @@ const Login = () => {
       sessionStorage.removeItem("auth_blocked_message");
     }
 
-    if (searchParams.get("invite") === "accepted") {
+    if (inviteAccepted) {
       toast.success("Invite accepted. Sign in with the password you created.");
     }
-  }, []);
+  }, [inviteAccepted]);
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();

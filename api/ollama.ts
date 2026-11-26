@@ -1,3 +1,5 @@
+import type { ApiRequest, ApiResponse } from "./http";
+
 type ChatMessage = {
   role: "system" | "user" | "assistant";
   content: string;
@@ -15,7 +17,7 @@ const buildSystemPrompt = (snapshot: string) =>
     `Clinic snapshot:\n${snapshot || "No clinic snapshot was provided."}`,
   ].join(" ");
 
-export default async function handler(req: any, res: any) {
+export default async function handler(req: ApiRequest, res: ApiResponse) {
   if (req.method !== "POST") {
     res.setHeader("Allow", "POST");
     return res.status(405).json({ error: "Method not allowed" });

@@ -103,7 +103,7 @@ const DrugsPage = () => {
   const inventoryRowRefs = useRef<Record<string, HTMLTableRowElement | null>>({});
   const highlightTimeoutRef = useRef<number | null>(null);
 
-  const fetchDrugs = async () => {
+  const fetchDrugs = useCallback(async () => {
     if (!clinicOwnerId) return;
     const cached = readClinicCache<Tables<"drugs">[]>(clinicOwnerId, "drugs");
     if (cached) {
@@ -117,9 +117,9 @@ const DrugsPage = () => {
     setDrugs(data ?? []);
     writeClinicCache(clinicOwnerId, "drugs", data ?? []);
     setLoading(false);
-  };
+  }, [clinicOwnerId]);
 
-  useEffect(() => { fetchDrugs(); }, [clinicOwnerId]);
+  useEffect(() => { void fetchDrugs(); }, [fetchDrugs]);
 
   const resetForm = () => {
     setForm(emptyDrugForm);

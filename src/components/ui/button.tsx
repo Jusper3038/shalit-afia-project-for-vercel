@@ -44,4 +44,6 @@ const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(
 );
 Button.displayName = "Button";
 
+// The variants helper is part of the public primitive API and is not a component.
+// eslint-disable-next-line react-refresh/only-export-components
 export { Button, buttonVariants };

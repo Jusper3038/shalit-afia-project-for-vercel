@@ -33,7 +33,8 @@ import { Card } from "@/components/ui/card";
 import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
-import PhoneNumberInput, { normalizePhoneNumber } from "@/components/PhoneNumberInput";
+import PhoneNumberInput from "@/components/PhoneNumberInput";
+import { normalizePhoneNumber } from "@/lib/phone";
 import type { AppPermission } from "@/lib/app-permissions";
 import type { ReleasedAppKey } from "@/lib/app-releases";
 

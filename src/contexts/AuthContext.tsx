@@ -72,6 +72,8 @@ const AuthContext = createContext<AuthContextType>({
   signOut: async () => {},
 });
 
+// Keep the context hook beside its provider; Fast Refresh cannot safely update both exports together.
+// eslint-disable-next-line react-refresh/only-export-components
 export const useAuth = () => useContext(AuthContext);
 
 export const AuthProvider = ({ children }: { children: ReactNode }) => {
@@ -142,7 +144,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
   const refreshReleasedApps = async () => {
     const { data, error } = await withTimeout(
-      (supabase as any)
+      supabase
         .from("platform_app_releases")
         .select("app_key,is_enabled"),
       { data: null, error: null }

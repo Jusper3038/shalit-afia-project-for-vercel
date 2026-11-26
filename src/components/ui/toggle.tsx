@@ -34,4 +34,6 @@ const Toggle = React.forwardRef<
 
 Toggle.displayName = TogglePrimitive.Root.displayName;
 
+// The variants helper is part of the public primitive API and is not a component.
+// eslint-disable-next-line react-refresh/only-export-components
 export { Toggle, toggleVariants };

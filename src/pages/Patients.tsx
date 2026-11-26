@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { logAudit } from "@/lib/audit";
@@ -14,7 +14,8 @@ import { Card, CardContent } from "@/components/ui/card";
 import { toast } from "sonner";
 import { Plus, Pencil, Trash2, Download } from "lucide-react";
 import type { Tables } from "@/integrations/supabase/types";
-import PhoneNumberInput, { COUNTRY_CODES, normalizePhoneNumber } from "@/components/PhoneNumberInput";
+import PhoneNumberInput from "@/components/PhoneNumberInput";
+import { COUNTRY_CODES, normalizePhoneNumber } from "@/lib/phone";
 import { readClinicCache, withQueryTimeout, writeClinicCache } from "@/lib/clinic-cache";
 
 const splitPhoneNumber = (value?: string | null) => {
@@ -34,7 +35,7 @@ const PatientsPage = () => {
   const [editing, setEditing] = useState<Tables<"patients"> | null>(null);
   const [form, setForm] = useState({ name: "", phone: "", countryCode: "+254", diagnosis: "" });
 
-  const fetchPatients = async () => {
+  const fetchPatients = useCallback(async () => {
     if (!clinicOwnerId) return;
     const cached = readClinicCache<Tables<"patients">[]>(clinicOwnerId, "patients");
     if (cached) {
@@ -48,9 +49,9 @@ const PatientsPage = () => {
     setPatients(data ?? []);
     writeClinicCache(clinicOwnerId, "patients", data ?? []);
     setLoading(false);
-  };
+  }, [clinicOwnerId]);
 
-  useEffect(() => { fetchPatients(); }, [clinicOwnerId]);
+  useEffect(() => { void fetchPatients(); }, [fetchPatients]);
 
   const resetForm = () => { setForm({ name: "", phone: "", countryCode: "+254", diagnosis: "" }); setEditing(null); };
 

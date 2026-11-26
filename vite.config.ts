@@ -2,6 +2,8 @@ import { defineConfig, loadEnv, type Plugin } from "vite";
 import react from "@vitejs/plugin-react-swc";
 import path from "path";
 import { componentTagger } from "lovable-tagger";
+import type { IncomingMessage, ServerResponse } from "node:http";
+import type { ApiRequest, ApiResponse } from "./api/http";
 
 const vendorChunkGroups: Record<string, string[]> = {
   supabase: ["@supabase"],
@@ -11,7 +13,7 @@ const vendorChunkGroups: Record<string, string[]> = {
   icons: ["lucide-react"],
 };
 
-const readRequestBody = (req: any) =>
+const readRequestBody = (req: IncomingMessage) =>
   new Promise<string>((resolve, reject) => {
     const chunks: Buffer[] = [];
 
@@ -20,7 +22,7 @@ const readRequestBody = (req: any) =>
     req.on("error", reject);
   });
 
-const sendJson = (res: any, statusCode: number, payload: unknown) => {
+const sendJson = (res: ServerResponse, statusCode: number, payload: unknown) => {
   res.statusCode = statusCode;
   res.setHeader("Content-Type", "application/json");
   res.end(JSON.stringify(payload));
@@ -29,7 +31,8 @@ const sendJson = (res: any, statusCode: number, payload: unknown) => {
 const localApiPlugin = (): Plugin => ({
   name: "local-api-routes",
   configureServer(server) {
-    const handlers: Record<string, () => Promise<{ default: (req: any, res: any) => Promise<unknown> }>> = {
+    type LocalApiHandler = (req: ApiRequest, res: ApiResponse) => Promise<unknown>;
+    const handlers: Record<string, () => Promise<{ default: LocalApiHandler }>> = {
       "/api/gemini": () => import("./api/gemini"),
       "/api/ollama": () => import("./api/ollama"),
     };

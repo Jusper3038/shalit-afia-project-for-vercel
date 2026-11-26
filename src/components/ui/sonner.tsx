@@ -24,4 +24,6 @@ const Toaster = ({ ...props }: ToasterProps) => {
   );
 };
 
+// Keep the toast API alongside its themed toaster component.
+// eslint-disable-next-line react-refresh/only-export-components
 export { Toaster, toast };

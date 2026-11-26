@@ -1,8 +1,10 @@
+import type { ApiRequest, ApiResponse } from "./http";
+
 export const config = {
   runtime: "nodejs",
 };
 
-export default function handler(_req: unknown, res: any) {
+export default function handler(_req: ApiRequest, res: ApiResponse) {
   const configured = Boolean(process.env.GEMINI_API_KEY || process.env.GOOGLE_API_KEY);
 
   return res.status(configured ? 200 : 503).json({
