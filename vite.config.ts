@@ -14,14 +14,10 @@ const vendorChunkGroups: Record<string, string[]> = {
 };
 
 const EXPECTED_SUPABASE_PROJECT_REF = "feiewilnuxeyuqvyuzxq";
+const DEFAULT_SUPABASE_URL = "https://feiewilnuxeyuqvyuzxq.supabase.co";
 
 const validateSupabaseEnvironment = () => {
-  const supabaseUrl = process.env.VITE_SUPABASE_URL?.trim();
-  const publishableKey = process.env.VITE_SUPABASE_PUBLISHABLE_KEY?.trim();
-
-  if (!supabaseUrl || !publishableKey) {
-    throw new Error("Set VITE_SUPABASE_URL and VITE_SUPABASE_PUBLISHABLE_KEY before starting or building the app.");
-  }
+  const supabaseUrl = process.env.VITE_SUPABASE_URL?.trim() || DEFAULT_SUPABASE_URL;
 
   let projectRef = "";
   try {

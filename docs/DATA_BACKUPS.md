@@ -6,7 +6,7 @@ The file contains clinic and patient information. Store it encrypted, restrict a
 
 ## Prevent connecting the app to the wrong database
 
-The browser app is pinned to the live project `feiewilnuxeyuqvyuzxq`. Vite requires an explicit URL and publishable key and rejects URLs for a different project at startup/build time. Settings also displays the connected project reference. Keep the live URL and its matching publishable key in local `.env.local` and in Vercel's Production and Preview environment variables. Never put the backup project's URL or key in the app's `VITE_SUPABASE_*` variables. Database replication credentials belong only in database-side replication setup; never commit them to GitHub or send them in chat.
+The browser app is pinned to the live project `feiewilnuxeyuqvyuzxq`. If environment variables are absent, it uses the live project's URL and publishable key defaults; it rejects any configured URL for a different project at startup/build time. Settings also displays the connected project reference. You can set matching values in local `.env.local` or Vercel's Production and Preview variables when desired. Never put the backup project's URL or key in the app's `VITE_SUPABASE_*` variables. Database replication credentials belong only in database-side replication setup; never commit them to GitHub or send them in chat.
 
 ## Protect the live Supabase project
 

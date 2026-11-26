@@ -1,13 +1,9 @@
 const EXPECTED_SUPABASE_PROJECT_REF = "feiewilnuxeyuqvyuzxq";
+const DEFAULT_SUPABASE_URL = "https://feiewilnuxeyuqvyuzxq.supabase.co";
+const DEFAULT_SUPABASE_PUBLISHABLE_KEY = "sb_publishable_RvjwhrlxzZFD615HRJJs0w_nWSvJa2A";
 
-const configuredUrl = import.meta.env.VITE_SUPABASE_URL?.trim();
-const configuredPublishableKey = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY?.trim();
-
-if (!configuredUrl || !configuredPublishableKey) {
-  throw new Error(
-    "Supabase is not configured. Set VITE_SUPABASE_URL and VITE_SUPABASE_PUBLISHABLE_KEY for the intended environment.",
-  );
-}
+const configuredUrl = import.meta.env.VITE_SUPABASE_URL?.trim() || DEFAULT_SUPABASE_URL;
+const configuredPublishableKey = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY?.trim() || DEFAULT_SUPABASE_PUBLISHABLE_KEY;
 
 let configuredProjectRef = "";
 try {
