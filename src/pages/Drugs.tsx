@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { Fragment, useEffect, useMemo, useRef, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { logAudit } from "@/lib/audit";
@@ -13,7 +13,7 @@ import { Badge } from "@/components/ui/badge";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { toast } from "sonner";
-import { Plus, Pencil, Trash2, Download, Search, ListPlus } from "lucide-react";
+import { Plus, Pencil, Trash2, Download, Search, ListPlus, PackagePlus, History, ChevronDown, ChevronRight } from "lucide-react";
 import type { Tables } from "@/integrations/supabase/types";
 import { getExpiredStockCostLoss, getExpiryLabel, getSellableStockQuantity, isExpiredDrug, isExpiringSoonDrug } from "@/lib/inventory";
 import { readClinicCache, withQueryTimeout, writeClinicCache } from "@/lib/clinic-cache";
@@ -28,7 +28,10 @@ const emptyDrugForm = {
   selling_price: "",
   stock_quantity: "",
   low_stock_threshold: "10",
+  movement_reason: "New batch received",
 };
+
+type InventoryMovementType = "delivery" | "correction" | "write_off";
 
 const normalizeSearchText = (value: string) =>
   value.toLowerCase().trim().replace(/\s+/g, " ");
@@ -56,11 +59,13 @@ const getDateSearchTokens = (value: string | null) => {
 type PendingSensitiveAction =
   | { type: "edit"; drug: Tables<"drugs"> }
   | { type: "delete"; drug: Tables<"drugs"> }
+  | { type: "movement"; drug: Tables<"drugs"> }
   | null;
 
 const DrugsPage = () => {
   const {
     clinicOwnerId,
+    role,
     hasOwnerSecurityPin,
     isSensitiveAccessVerified,
     verifySensitiveAccess,
@@ -71,6 +76,17 @@ const DrugsPage = () => {
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editingDrug, setEditingDrug] = useState<Tables<"drugs"> | null>(null);
   const [form, setForm] = useState(emptyDrugForm);
+  const [savingDrug, setSavingDrug] = useState(false);
+  const [movementDialogOpen, setMovementDialogOpen] = useState(false);
+  const [movementDrug, setMovementDrug] = useState<Tables<"drugs"> | null>(null);
+  const [movementType, setMovementType] = useState<InventoryMovementType>("delivery");
+  const [movementQuantity, setMovementQuantity] = useState("1");
+  const [movementReason, setMovementReason] = useState("");
+  const [savingMovement, setSavingMovement] = useState(false);
+  const [historyDialogOpen, setHistoryDialogOpen] = useState(false);
+  const [historyDrug, setHistoryDrug] = useState<Tables<"drugs"> | null>(null);
+  const [movementHistory, setMovementHistory] = useState<Tables<"inventory_movements">[]>([]);
+  const [loadingHistory, setLoadingHistory] = useState(false);
   const [pinDialogOpen, setPinDialogOpen] = useState(false);
   const [pin, setPin] = useState("");
   const [confirmPin, setConfirmPin] = useState("");
@@ -81,6 +97,7 @@ const DrugsPage = () => {
   const [catalogSearch, setCatalogSearch] = useState("");
   const [isInventorySearchFocused, setIsInventorySearchFocused] = useState(false);
   const [highlightedDrugId, setHighlightedDrugId] = useState<string | null>(null);
+  const [expandedProducts, setExpandedProducts] = useState<Record<string, boolean>>({});
   const inventoryRowRefs = useRef<Record<string, HTMLTableRowElement | null>>({});
   const highlightTimeoutRef = useRef<number | null>(null);
 
@@ -113,11 +130,11 @@ const DrugsPage = () => {
     setPendingSensitiveAction(null);
   };
 
-  const openAddDialog = (catalogItem?: DrugCatalogItem) => {
+  const openAddDialog = (catalogItem?: DrugCatalogItem, existingProductName?: string) => {
     setEditingDrug(null);
     setForm({
       ...emptyDrugForm,
-      name: catalogItem?.name ?? "",
+      name: existingProductName ?? catalogItem?.name ?? "",
     });
     setDialogOpen(true);
   };
@@ -133,11 +150,16 @@ const DrugsPage = () => {
       selling_price: String(drug.selling_price),
       stock_quantity: String(drug.stock_quantity),
       low_stock_threshold: String(drug.low_stock_threshold),
+      movement_reason: "New batch received",
     });
     setDialogOpen(true);
   };
 
   const performDelete = async (drug: Tables<"drugs">) => {
+    if (drug.stock_quantity > 0) {
+      toast.error("Write off or move the remaining stock before deleting this batch.");
+      return;
+    }
     if (!confirm(`Delete "${drug.name}"?`)) return;
     const { error } = await supabase.from("drugs").delete().eq("id", drug.id);
     if (error) { toast.error(error.message); return; }
@@ -193,28 +215,39 @@ const DrugsPage = () => {
     }
 
     const payload = {
-      user_id: clinicOwnerId,
       name: trimmedName,
       serial_number: trimmedSerial || null,
       expiry_date: form.expiry_date || null,
       date_of_purchase: form.date_of_purchase || null,
       buying_price: buyingPrice,
       selling_price: sellingPrice,
-      stock_quantity: stockQuantity,
       low_stock_threshold: lowStockThreshold,
     };
 
+    setSavingDrug(true);
     if (editingDrug) {
       const { error } = await supabase.from("drugs").update(payload).eq("id", editingDrug.id);
-      if (error) { toast.error(error.message); return; }
+      if (error) { setSavingDrug(false); toast.error(error.message); return; }
       await logAudit("Updated drug", `Updated ${form.name}`);
-      toast.success("Drug updated!");
+      toast.success("Batch details updated.");
     } else {
-      const { error } = await supabase.from("drugs").insert(payload);
-      if (error) { toast.error(error.message); return; }
-      await logAudit("Added drug", `Added ${form.name}`);
-      toast.success("Drug added!");
+      const { error } = await supabase.rpc("add_inventory_batch", {
+        p_name: trimmedName,
+        p_serial_number: trimmedSerial || null,
+        p_expiry_date: form.expiry_date || null,
+        p_date_of_purchase: form.date_of_purchase || null,
+        p_buying_price: buyingPrice,
+        p_selling_price: sellingPrice,
+        p_stock_quantity: stockQuantity,
+        p_low_stock_threshold: lowStockThreshold,
+        p_reason: form.movement_reason.trim(),
+      });
+      if (error) { setSavingDrug(false); toast.error(error.message); return; }
+      await logAudit("Received inventory batch", `Added batch ${trimmedSerial || "without a batch number"} of ${trimmedName} (${stockQuantity} units).`);
+      toast.success(`New ${trimmedName} batch added. Existing batches were kept separate.`);
+      setExpandedProducts((current) => ({ ...current, [normalizeSearchText(trimmedName)]: true }));
     }
+    setSavingDrug(false);
     setDialogOpen(false);
     resetForm();
     fetchDrugs();
@@ -226,6 +259,11 @@ const DrugsPage = () => {
     if (isSensitiveAccessVerified()) {
       if (action.type === "edit") {
         openEditDialog(action.drug);
+        return;
+      }
+
+      if (action.type === "movement") {
+        openMovementDialog(action.drug);
         return;
       }
 
@@ -243,6 +281,85 @@ const DrugsPage = () => {
 
   const handleDelete = (drug: Tables<"drugs">) => {
     requestSensitiveAction({ type: "delete", drug });
+  };
+
+  const openMovementDialog = (drug: Tables<"drugs">) => {
+    setMovementDrug(drug);
+    setMovementType("delivery");
+    setMovementQuantity("1");
+    setMovementReason("");
+    setMovementDialogOpen(true);
+  };
+
+  const handleStockAction = (drug: Tables<"drugs">) => {
+    if (role !== "admin") {
+      openMovementDialog(drug);
+      return;
+    }
+    requestSensitiveAction({ type: "movement", drug });
+  };
+
+  const submitStockMovement = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!movementDrug) return;
+
+    const quantity = Number(movementQuantity);
+    if (!Number.isInteger(quantity) || quantity === 0) {
+      toast.error("Enter a non-zero whole-number quantity.");
+      return;
+    }
+    if (movementType !== "correction" && quantity < 1) {
+      toast.error("Enter a positive quantity for deliveries and write-offs.");
+      return;
+    }
+    if (movementReason.trim().length < 3) {
+      toast.error("Add a short reason for this stock movement.");
+      return;
+    }
+
+    setSavingMovement(true);
+    const { error } = await supabase.rpc("record_inventory_stock_change", {
+      p_drug_id: movementDrug.id,
+      p_movement_type: movementType,
+      p_quantity: quantity,
+      p_reason: movementReason.trim(),
+    });
+    setSavingMovement(false);
+
+    if (error) {
+      toast.error(error.message);
+      return;
+    }
+
+    const actionLabel = movementType === "delivery" ? "Received" : movementType === "write_off" ? "Written off" : "Corrected";
+    await logAudit(`Inventory ${movementType.replace("_", " ")}`, `${actionLabel} ${quantity} unit(s) of ${movementDrug.name}, batch ${movementDrug.serial_number || "-"}. Reason: ${movementReason.trim()}`);
+    toast.success("Stock movement recorded.");
+    setMovementDialogOpen(false);
+    fetchDrugs();
+  };
+
+  const openMovementHistory = async (drug: Tables<"drugs"> | null = null) => {
+    setHistoryDrug(drug);
+    setMovementHistory([]);
+    setHistoryDialogOpen(true);
+    if (!clinicOwnerId) return;
+
+    setLoadingHistory(true);
+    let query = supabase
+      .from("inventory_movements")
+      .select("*")
+      .eq("user_id", clinicOwnerId)
+      .order("created_at", { ascending: false })
+      .limit(200);
+    if (drug) query = query.eq("drug_id", drug.id);
+
+    const { data, error } = await query;
+    setLoadingHistory(false);
+    if (error) {
+      toast.error(error.message);
+      return;
+    }
+    setMovementHistory(data ?? []);
   };
 
   useEffect(() => {
@@ -279,6 +396,7 @@ const DrugsPage = () => {
     setInventorySearch(drug.name);
     setIsInventorySearchFocused(false);
     setHighlightedDrugId(drug.id);
+    setExpandedProducts((current) => ({ ...current, [normalizeSearchText(drug.name)]: true }));
 
     if (highlightTimeoutRef.current) {
       window.clearTimeout(highlightTimeoutRef.current);
@@ -289,10 +407,10 @@ const DrugsPage = () => {
       highlightTimeoutRef.current = null;
     }, 2200);
 
-    window.requestAnimationFrame(() => {
+    window.requestAnimationFrame(() => window.requestAnimationFrame(() => {
       const row = inventoryRowRefs.current[drug.id];
       row?.scrollIntoView({ behavior: "smooth", block: "center" });
-    });
+    }));
   };
 
   const normalizedCatalogSearch = catalogSearch.trim().toLowerCase();
@@ -309,6 +427,28 @@ const DrugsPage = () => {
       return haystack.includes(normalizedCatalogSearch);
     }).slice(0, 12);
   }, [normalizedCatalogSearch]);
+
+  const groupedProducts = useMemo(() => {
+    const groups = new Map<string, Tables<"drugs">[]>();
+    drugs.forEach((drug) => {
+      const key = normalizeSearchText(drug.name);
+      const batches = groups.get(key) ?? [];
+      batches.push(drug);
+      groups.set(key, batches);
+    });
+
+    return Array.from(groups.entries())
+      .map(([key, batches]) => ({
+        key,
+        name: batches[0]?.name ?? "",
+        batches: [...batches].sort((a, b) => {
+          if (!a.expiry_date) return b.expiry_date ? 1 : 0;
+          if (!b.expiry_date) return -1;
+          return a.expiry_date.localeCompare(b.expiry_date);
+        }),
+      }))
+      .sort((a, b) => a.name.localeCompare(b.name));
+  }, [drugs]);
 
   const handleVerifySensitiveAction = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -336,6 +476,11 @@ const DrugsPage = () => {
       return;
     }
 
+    if (action.type === "movement") {
+      openMovementDialog(action.drug);
+      return;
+    }
+
     await performDelete(action.drug);
   };
 
@@ -351,12 +496,16 @@ const DrugsPage = () => {
     if (!drug.expiry_date) return <Badge variant="outline">No Expiry</Badge>;
     if (isExpiredDrug(drug)) return <Badge variant="destructive">EXPIRED</Badge>;
     if (isExpiringSoonDrug(drug)) return <Badge className="bg-amber-500 text-amber-950">{getExpiryLabel(drug).toUpperCase()}</Badge>;
-    return <Badge className="bg-sky-500 text-sky-950">VALID</Badge>;
+    return <Badge className="bg-sky-500 text-sky-950">{getExpiryLabel(drug).toUpperCase()}</Badge>;
   };
 
   const formatDate = (value: string | null) => value ? new Date(value).toLocaleDateString() : "-";
   const pinSetupInvalid = !hasOwnerSecurityPin && (pin.length < 4 || pin !== confirmPin);
-  const sensitiveActionLabel = pendingSensitiveAction?.type === "delete" ? "delete this item" : "edit this item";
+  const sensitiveActionLabel = pendingSensitiveAction?.type === "delete"
+    ? "delete this batch"
+    : pendingSensitiveAction?.type === "movement"
+      ? "record a stock movement"
+      : "edit this batch";
 
   useEffect(() => {
     return () => {
@@ -375,18 +524,32 @@ const DrugsPage = () => {
             <Button className="w-full sm:w-auto" variant="outline" size="sm" onClick={() => exportToCSV(drugs.map(d => ({ Name: d.name, "Serial Number": d.serial_number ?? "", "Expiry Date": d.expiry_date ?? "", "Date of Purchase": d.date_of_purchase ?? "", "Buying Price": d.buying_price, "Selling Price": d.selling_price, "Usable Stock": getSellableStockQuantity(d), "Physical Stock": d.stock_quantity, "Expired Stock Loss": getExpiredStockCostLoss(d) })), "drugs-report")}>
               <Download className="mr-2 h-4 w-4" />CSV
             </Button>
+            <Button className="w-full sm:w-auto" variant="outline" size="sm" onClick={() => openMovementHistory()}>
+              <History className="mr-2 h-4 w-4" />Stock History
+            </Button>
             <Dialog open={dialogOpen} onOpenChange={(o) => { setDialogOpen(o); if (!o) resetForm(); }}>
               <DialogTrigger asChild>
-                <Button className="w-full sm:w-auto" size="sm" onClick={() => openAddDialog()}><Plus className="mr-2 h-4 w-4" />Add Item</Button>
+                <Button className="w-full sm:w-auto" size="sm" onClick={() => openAddDialog()}><PackagePlus className="mr-2 h-4 w-4" />Receive New Batch</Button>
               </DialogTrigger>
               <DialogContent className="max-h-[85vh] overflow-y-auto">
                 <DialogHeader>
-                  <DialogTitle>{editingDrug ? "Edit Drug" : "Add New Drug"}</DialogTitle>
+                  <DialogTitle>{editingDrug ? "Edit Batch Details" : "Receive a New Batch"}</DialogTitle>
+                  {!editingDrug && (
+                    <DialogDescription>
+                      Each delivery is saved as its own batch. You can use the same product name again without replacing existing stock.
+                    </DialogDescription>
+                  )}
                 </DialogHeader>
                 <form onSubmit={handleSubmit} className="space-y-4">
-                  <div><Label>Name</Label><Input value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} maxLength={120} required /></div>
+                  <div>
+                    <Label>Product Name</Label>
+                    <Input list="inventory-product-names" value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} maxLength={120} required />
+                    <datalist id="inventory-product-names">
+                      {Array.from(new Set(drugs.map((drug) => drug.name))).map((name) => <option key={name} value={name} />)}
+                    </datalist>
+                  </div>
                   <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-                    <div><Label>Serial Number</Label><Input value={form.serial_number} onChange={(e) => setForm({ ...form, serial_number: e.target.value })} placeholder="Optional batch or serial" /></div>
+                  <div><Label>Batch / Lot Number</Label><Input value={form.serial_number} onChange={(e) => setForm({ ...form, serial_number: e.target.value })} placeholder="Optional batch or lot number" /></div>
                     <div><Label>Expiry Date</Label><Input type="date" value={form.expiry_date} onChange={(e) => setForm({ ...form, expiry_date: e.target.value })} /></div>
                   </div>
                   <div><Label>Date of Purchase</Label><Input type="date" value={form.date_of_purchase} onChange={(e) => setForm({ ...form, date_of_purchase: e.target.value })} /></div>
@@ -395,10 +558,20 @@ const DrugsPage = () => {
                     <div><Label>Selling Price (KSh)</Label><Input type="number" step="0.01" min="0" value={form.selling_price} onChange={(e) => setForm({ ...form, selling_price: e.target.value })} required /></div>
                   </div>
                   <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-                    <div><Label>Stock Quantity</Label><Input type="number" step="1" min="0" value={form.stock_quantity} onChange={(e) => setForm({ ...form, stock_quantity: e.target.value })} required /></div>
+                    {!editingDrug && (
+                      <div><Label>Received Quantity</Label><Input type="number" step="1" min="0" value={form.stock_quantity} onChange={(e) => setForm({ ...form, stock_quantity: e.target.value })} required /></div>
+                    )}
                     <div><Label>Low Stock Threshold</Label><Input type="number" step="1" min="0" value={form.low_stock_threshold} onChange={(e) => setForm({ ...form, low_stock_threshold: e.target.value })} required /></div>
                   </div>
-                  <Button type="submit" className="w-full">{editingDrug ? "Update" : "Add"} Drug</Button>
+                  {!editingDrug ? (
+                    <div>
+                      <Label>Delivery / Opening Stock Note</Label>
+                      <Input value={form.movement_reason} onChange={(e) => setForm({ ...form, movement_reason: e.target.value })} maxLength={240} required />
+                    </div>
+                  ) : (
+                    <p className="text-sm text-muted-foreground">Stock is changed from the batch actions so every delivery, correction, or write-off is recorded.</p>
+                  )}
+                  <Button type="submit" className="w-full" disabled={savingDrug}>{savingDrug ? "Saving..." : editingDrug ? "Save Batch Details" : "Save New Batch"}</Button>
                 </form>
               </DialogContent>
             </Dialog>
@@ -489,7 +662,7 @@ const DrugsPage = () => {
                 ))}
               </div>
               <p className="text-xs text-muted-foreground">
-                Catalog picks do not become inventory until you save them with stock, purchase, and selling details.
+                Catalog picks are only a name helper. Each saved entry is a separate inventory batch.
               </p>
             </CardContent>
           </Card>
@@ -500,17 +673,13 @@ const DrugsPage = () => {
             {loading ? (
               <div className="flex items-center justify-center h-32"><div className="animate-spin rounded-full h-6 w-6 border-b-2 border-primary" /></div>
             ) : drugs.length === 0 ? (
-              <div className="p-6 text-center text-muted-foreground">No drugs yet. Click "Add Drug" to get started.</div>
+              <div className="p-6 text-center text-muted-foreground">No products yet. Click "Receive New Batch" to get started.</div>
             ) : (
-              <Table className="min-w-[920px]">
+              <Table className="min-w-[760px]">
                 <TableHeader>
                   <TableRow>
-                    <TableHead>Name</TableHead>
-                    <TableHead>Serial No.</TableHead>
-                    <TableHead>Expiry</TableHead>
-                    <TableHead>Purchased</TableHead>
-                    <TableHead>Buy Price</TableHead>
-                    <TableHead>Sell Price</TableHead>
+                    <TableHead>Product</TableHead>
+                    <TableHead>Batches</TableHead>
                     <TableHead>Usable Stock</TableHead>
                     <TableHead>Physical Stock</TableHead>
                     <TableHead>Status</TableHead>
@@ -518,42 +687,218 @@ const DrugsPage = () => {
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {drugs.map((d) => (
-                    <TableRow
-                      key={d.id}
-                      ref={(row) => {
-                        inventoryRowRefs.current[d.id] = row;
-                      }}
-                      className={highlightedDrugId === d.id ? "bg-accent/50 transition-colors" : undefined}
-                    >
-                      <TableCell className="font-medium">{d.name}</TableCell>
-                      <TableCell>{d.serial_number || "-"}</TableCell>
-                      <TableCell>{formatDate(d.expiry_date)}</TableCell>
-                      <TableCell>{formatDate(d.date_of_purchase)}</TableCell>
-                      <TableCell>KSh {Number(d.buying_price).toLocaleString()}</TableCell>
-                      <TableCell>KSh {Number(d.selling_price).toLocaleString()}</TableCell>
-                      <TableCell>{getSellableStockQuantity(d)}</TableCell>
-                      <TableCell>{d.stock_quantity}</TableCell>
-                      <TableCell>
-                        <div className="flex flex-wrap gap-2">
-                          {getStockBadge(d)}
-                          {getExpiryBadge(d)}
-                        </div>
-                      </TableCell>
-                      <TableCell className="text-right">
-                        <div className="flex justify-end gap-1">
-                          <Button variant="ghost" size="icon" onClick={() => handleEdit(d)}><Pencil className="h-4 w-4" /></Button>
-                          <Button variant="ghost" size="icon" onClick={() => handleDelete(d)}><Trash2 className="h-4 w-4" /></Button>
-                        </div>
-                      </TableCell>
-                    </TableRow>
-                  ))}
+                  {groupedProducts.map((product) => {
+                    const expanded = Boolean(expandedProducts[product.key]);
+                    const usableStock = product.batches.reduce((total, batch) => total + getSellableStockQuantity(batch), 0);
+                    const physicalStock = product.batches.reduce((total, batch) => total + batch.stock_quantity, 0);
+                    const lowStockBatches = product.batches.filter((batch) => {
+                      const usable = getSellableStockQuantity(batch);
+                      return usable > 0 && usable <= batch.low_stock_threshold;
+                    }).length;
+                    const expiredBatches = product.batches.filter((batch) => isExpiredDrug(batch) && batch.stock_quantity > 0).length;
+
+                    return (
+                      <Fragment key={product.key}>
+                        <TableRow>
+                          <TableCell>
+                            <div className="flex items-center gap-2">
+                              <Button
+                                variant="outline"
+                                size="icon"
+                                className="border-blue-200 bg-blue-50/50 text-orange-500 hover:border-orange-300 hover:bg-orange-50 hover:text-orange-600"
+                                aria-label={`${expanded ? "Collapse" : "Expand"} ${product.name} batches`}
+                                aria-expanded={expanded}
+                                onClick={() => setExpandedProducts((current) => ({ ...current, [product.key]: !current[product.key] }))}
+                              >
+                                {expanded ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
+                              </Button>
+                              <span className="font-medium">{product.name}</span>
+                            </div>
+                          </TableCell>
+                          <TableCell>{product.batches.length}</TableCell>
+                          <TableCell className="font-medium">{usableStock}</TableCell>
+                          <TableCell>{physicalStock}</TableCell>
+                          <TableCell>
+                            <div className="flex flex-wrap gap-2">
+                              {usableStock > 0 && lowStockBatches === 0 && <Badge className="bg-green-500 text-green-950">In Stock</Badge>}
+                              {lowStockBatches > 0 && <Badge className="bg-yellow-500 text-yellow-950">{lowStockBatches} low batch{lowStockBatches === 1 ? "" : "es"}</Badge>}
+                              {expiredBatches > 0 && <Badge variant="destructive">{expiredBatches} expired</Badge>}
+                              {usableStock === 0 && physicalStock === 0 && <Badge variant="destructive">OUT OF STOCK</Badge>}
+                            </div>
+                          </TableCell>
+                          <TableCell className="text-right">
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={() => openAddDialog(undefined, product.name)}
+                              aria-label={`Receive another ${product.name} batch`}
+                            >
+                              <PackagePlus className="mr-2 h-4 w-4" />Add Batch
+                            </Button>
+                          </TableCell>
+                        </TableRow>
+                        {expanded && (
+                          <TableRow>
+                            <TableCell colSpan={6} className="bg-muted/30 p-3">
+                              <Table className="min-w-[900px] bg-background">
+                                <TableHeader>
+                                  <TableRow>
+                                    <TableHead>Batch / Lot</TableHead>
+                                    <TableHead>Purchase Date</TableHead>
+                                    <TableHead>Expiry Date</TableHead>
+                                    <TableHead>Buy Price</TableHead>
+                                    <TableHead>Sell Price</TableHead>
+                                    <TableHead>Usable</TableHead>
+                                    <TableHead>Physical</TableHead>
+                                    <TableHead>Status</TableHead>
+                                    <TableHead className="text-right">Batch Actions</TableHead>
+                                  </TableRow>
+                                </TableHeader>
+                                <TableBody>
+                                  {product.batches.map((batch) => (
+                                    <TableRow
+                                      key={batch.id}
+                                      ref={(row) => {
+                                        inventoryRowRefs.current[batch.id] = row;
+                                      }}
+                                      className={highlightedDrugId === batch.id ? "bg-accent/50 transition-colors" : undefined}
+                                    >
+                                      <TableCell className="font-medium">{batch.serial_number || "No batch number"}</TableCell>
+                                      <TableCell>{formatDate(batch.date_of_purchase)}</TableCell>
+                                      <TableCell>{formatDate(batch.expiry_date)}</TableCell>
+                                      <TableCell>KSh {Number(batch.buying_price).toLocaleString()}</TableCell>
+                                      <TableCell>KSh {Number(batch.selling_price).toLocaleString()}</TableCell>
+                                      <TableCell>{getSellableStockQuantity(batch)}</TableCell>
+                                      <TableCell>{batch.stock_quantity}</TableCell>
+                                      <TableCell><div className="flex flex-wrap gap-2">{getStockBadge(batch)}{getExpiryBadge(batch)}</div></TableCell>
+                                      <TableCell className="text-right">
+                                        <div className="flex justify-end gap-1">
+                                          <Button variant="ghost" size="icon" title="View batch movement history" aria-label={`Movement history for ${product.name}, batch ${batch.serial_number || "without batch number"}`} onClick={() => openMovementHistory(batch)}><History className="h-4 w-4" /></Button>
+                                          <Button variant="ghost" size="icon" title="Receive, correct, or write off this batch" aria-label={`Stock actions for ${product.name}, batch ${batch.serial_number || "without batch number"}`} onClick={() => handleStockAction(batch)}><PackagePlus className="h-4 w-4" /></Button>
+                                          <Button variant="ghost" size="icon" title="Edit batch details" aria-label={`Edit ${product.name} batch ${batch.serial_number || "without batch number"}`} onClick={() => handleEdit(batch)}><Pencil className="h-4 w-4" /></Button>
+                                          <Button variant="ghost" size="icon" title="Delete empty batch" aria-label={`Delete ${product.name} batch ${batch.serial_number || "without batch number"}`} onClick={() => handleDelete(batch)}><Trash2 className="h-4 w-4" /></Button>
+                                        </div>
+                                      </TableCell>
+                                    </TableRow>
+                                  ))}
+                                </TableBody>
+                              </Table>
+                            </TableCell>
+                          </TableRow>
+                        )}
+                      </Fragment>
+                    );
+                  })}
                 </TableBody>
               </Table>
             )}
           </CardContent>
         </Card>
       </div>
+      <Dialog open={movementDialogOpen} onOpenChange={setMovementDialogOpen}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Record Stock Movement</DialogTitle>
+            <DialogDescription>
+              {movementDrug && `${movementDrug.name} · Batch ${movementDrug.serial_number || "without a batch number"} · Current stock: ${movementDrug.stock_quantity}`}
+            </DialogDescription>
+          </DialogHeader>
+          <form onSubmit={submitStockMovement} className="space-y-4">
+            <div className="space-y-2">
+              <Label htmlFor="inventory-movement-type">Movement</Label>
+              <select
+                id="inventory-movement-type"
+                className="h-10 w-full rounded-md border border-input bg-background px-3 text-sm"
+                value={movementType}
+                onChange={(e) => {
+                  setMovementType(e.target.value as InventoryMovementType);
+                  setMovementQuantity("1");
+                }}
+              >
+                <option value="delivery">Receive more of this batch</option>
+                <option value="correction">Correct stock count (+ or −)</option>
+                <option value="write_off">Write off stock</option>
+              </select>
+              <p className="text-xs text-muted-foreground">
+                To receive a different lot, use “Receive New Batch” so its batch number and expiry stay separate.
+              </p>
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="inventory-movement-quantity">
+                {movementType === "correction" ? "Quantity change (+/- units)" : "Quantity"}
+              </Label>
+              <Input
+                id="inventory-movement-quantity"
+                type="number"
+                step="1"
+                min={movementType === "correction" ? undefined : 1}
+                value={movementQuantity}
+                onChange={(e) => setMovementQuantity(e.target.value)}
+                required
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="inventory-movement-reason">Reason / reference</Label>
+              <Input
+                id="inventory-movement-reason"
+                value={movementReason}
+                onChange={(e) => setMovementReason(e.target.value)}
+                placeholder={movementType === "delivery" ? "Supplier delivery or receipt number" : movementType === "write_off" ? "Expired, damaged, or other reason" : "Stock count correction reason"}
+                maxLength={240}
+                required
+              />
+            </div>
+            <DialogFooter>
+              <Button type="button" variant="outline" onClick={() => setMovementDialogOpen(false)}>Cancel</Button>
+              <Button type="submit" disabled={savingMovement}>{savingMovement ? "Saving..." : "Save Movement"}</Button>
+            </DialogFooter>
+          </form>
+        </DialogContent>
+      </Dialog>
+      <Dialog open={historyDialogOpen} onOpenChange={setHistoryDialogOpen}>
+        <DialogContent className="max-h-[85vh] max-w-5xl overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>{historyDrug ? `${historyDrug.name} Batch History` : "Inventory Movement History"}</DialogTitle>
+            <DialogDescription>
+              {historyDrug ? `Batch ${historyDrug.serial_number || "without a batch number"}` : "Recent receipts, corrections, write-offs, and sales. Showing up to 200 records."}
+            </DialogDescription>
+          </DialogHeader>
+          {loadingHistory ? (
+            <div className="flex h-28 items-center justify-center"><div className="h-6 w-6 animate-spin rounded-full border-b-2 border-primary" /></div>
+          ) : movementHistory.length === 0 ? (
+            <p className="py-8 text-center text-sm text-muted-foreground">No stock movements recorded yet.</p>
+          ) : (
+            <div className="overflow-x-auto">
+              <Table className="min-w-[840px]">
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Date</TableHead>
+                    <TableHead>Product / Batch</TableHead>
+                    <TableHead>Movement</TableHead>
+                    <TableHead>Change</TableHead>
+                    <TableHead>Before → After</TableHead>
+                    <TableHead>Reason</TableHead>
+                    <TableHead>Recorded By</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {movementHistory.map((movement) => (
+                    <TableRow key={movement.id}>
+                      <TableCell className="whitespace-nowrap">{new Date(movement.created_at).toLocaleString()}</TableCell>
+                      <TableCell>{movement.product_name}<div className="text-xs text-muted-foreground">{movement.batch_number || "No batch number"}</div></TableCell>
+                      <TableCell className="capitalize">{movement.movement_type.replace(/_/g, " ")}</TableCell>
+                      <TableCell className={movement.quantity_change > 0 ? "font-medium text-green-700" : "font-medium text-red-700"}>{movement.quantity_change > 0 ? `+${movement.quantity_change}` : movement.quantity_change}</TableCell>
+                      <TableCell>{movement.quantity_before} → {movement.quantity_after}</TableCell>
+                      <TableCell className="max-w-[240px] whitespace-normal">{movement.reason || "-"}</TableCell>
+                      <TableCell>{movement.created_by_name || (movement.created_by ? movement.created_by.slice(0, 8) : "Opening balance")}</TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
       <Dialog
         open={pinDialogOpen}
         onOpenChange={(open) => {

@@ -49,6 +49,8 @@ type ReceiptData = {
   lines: ReceiptLine[];
 };
 
+const normalizeProductName = (value: string) => value.toLowerCase().trim().replace(/\s+/g, " ");
+
 type TransactionGroup = {
   key: string;
   createdAt: string;
@@ -122,18 +124,17 @@ const BillingPage = () => {
     return acc;
   }, {});
 
-  const getBatchSortValue = (drug: Tables<"drugs">) => {
-    if (drug.expiry_date) return new Date(drug.expiry_date).getTime();
-    if (drug.date_of_purchase) return new Date(drug.date_of_purchase).getTime();
-    return Number.MAX_SAFE_INTEGER;
-  };
+  const getBatchPurchaseDate = (drug: Tables<"drugs">) =>
+    drug.date_of_purchase ?? drug.created_at.slice(0, 10);
 
   const validBatches = availableDrugs
     .filter((d) => !isExpiredDrug(d))
     .sort((a, b) => {
-      const expiryCompare = getBatchSortValue(a) - getBatchSortValue(b);
+      const purchaseCompare = getBatchPurchaseDate(a).localeCompare(getBatchPurchaseDate(b));
+      if (purchaseCompare !== 0) return purchaseCompare;
+      const expiryCompare = (a.expiry_date ?? "9999-12-31").localeCompare(b.expiry_date ?? "9999-12-31");
       if (expiryCompare !== 0) return expiryCompare;
-      return a.name.localeCompare(b.name);
+      return a.created_at.localeCompare(b.created_at);
     });
 
   const itemSummaries = Object.values(
@@ -144,7 +145,8 @@ const BillingPage = () => {
       serials: string[];
       batches: Tables<"drugs">[];
     }>>((acc, drug) => {
-      const existing = acc[drug.name];
+      const productKey = normalizeProductName(drug.name);
+      const existing = acc[productKey];
       if (existing) {
         existing.totalStock += drug.stock_quantity;
         existing.batches.push(drug);
@@ -153,7 +155,7 @@ const BillingPage = () => {
           existing.nextExpiry = drug.expiry_date;
         }
       } else {
-        acc[drug.name] = {
+        acc[productKey] = {
           itemName: drug.name,
           totalStock: drug.stock_quantity,
           nextExpiry: drug.expiry_date,
@@ -166,7 +168,7 @@ const BillingPage = () => {
     }, {})
   ).sort((a, b) => a.itemName.localeCompare(b.itemName));
 
-  const selectedItemSummary = itemSummaries.find((item) => item.itemName === selectedDrug);
+  const selectedItemSummary = itemSummaries.find((item) => normalizeProductName(item.itemName) === normalizeProductName(selectedDrug));
   const draftQuantity = parseInt(quantity || "0", 10);
   const configuredMaximumDiscountPercentage = clampPercent(
     parseFloat(maximumDiscountPercentage || "0")
@@ -177,13 +179,13 @@ const BillingPage = () => {
   const selectedPatientData = patients.find((patient) => patient.id === selectedPatient);
 
   const getRemainingStock = (itemName: string) => {
-    const summary = itemSummaries.find((item) => item.itemName === itemName);
+    const summary = itemSummaries.find((item) => normalizeProductName(item.itemName) === normalizeProductName(itemName));
     if (!summary) return 0;
     return Math.max(summary.totalStock - (billReservedByItem[itemName] ?? 0), 0);
   };
 
   const getBatchAllocations = (itemName: string, quantityNeeded: number): BatchAllocation[] | null => {
-    const matchingBatches = validBatches.filter((drug) => drug.name === itemName);
+    const matchingBatches = validBatches.filter((drug) => normalizeProductName(drug.name) === normalizeProductName(itemName));
     let remaining = quantityNeeded;
     const allocations: BatchAllocation[] = [];
 
@@ -619,7 +621,7 @@ const BillingPage = () => {
                                       <span className="text-xs text-muted-foreground sm:text-right">
                                         Stock: {getRemainingStock(item.itemName)}
                                         {item.serials.length > 0 ? ` | ${item.serials.length} batch(es)` : ""}
-                                        {item.nextExpiry ? ` | Next: ${getExpiryLabel(item.batches[0])}` : ""}
+                                        {item.nextExpiry ? ` | Next: ${getExpiryLabel(item.batches.find((batch) => batch.expiry_date === item.nextExpiry) ?? item.batches[0])}` : ""}
                                       </span>
                                     </div>
                                   </CommandItem>
@@ -666,7 +668,7 @@ const BillingPage = () => {
                     <p className="text-sm text-muted-foreground">Batches available: {selectedItemSummary.batches.length}</p>
                     {draftPricing && draftPricing.allocations.length > 0 && (
                       <p className={cn("text-sm", isExpiringSoonDrug(draftPricing.allocations[0].drug) ? "text-amber-700 font-medium" : "text-muted-foreground")}>
-                        First batch used: {draftPricing.allocations[0].drug.serial_number || draftPricing.allocations[0].drug.name} | {getExpiryLabel(draftPricing.allocations[0].drug)}
+                        Oldest purchase batch sold first: {draftPricing.allocations[0].drug.serial_number || draftPricing.allocations[0].drug.name} | {getExpiryLabel(draftPricing.allocations[0].drug)}
                       </p>
                     )}
                     <p className="text-sm text-muted-foreground">

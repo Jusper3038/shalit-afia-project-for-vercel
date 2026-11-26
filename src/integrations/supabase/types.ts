@@ -83,6 +83,60 @@ export type Database = {
         }
         Relationships: []
       }
+      inventory_movements: {
+        Row: {
+          batch_number: string | null
+          created_at: string
+          created_by: string | null
+          created_by_name: string | null
+          drug_id: string | null
+          expiry_date: string | null
+          id: string
+          movement_type: string
+          product_name: string
+          quantity_after: number
+          quantity_before: number
+          quantity_change: number
+          reason: string
+          unit_buying_price: number
+          user_id: string
+        }
+        Insert: {
+          batch_number?: string | null
+          created_at?: string
+          created_by?: string | null
+          created_by_name?: string | null
+          drug_id?: string | null
+          expiry_date?: string | null
+          id?: string
+          movement_type: string
+          product_name: string
+          quantity_after: number
+          quantity_before: number
+          quantity_change: number
+          reason?: string
+          unit_buying_price?: number
+          user_id: string
+        }
+        Update: {
+          batch_number?: string | null
+          created_at?: string
+          created_by?: string | null
+          created_by_name?: string | null
+          drug_id?: string | null
+          expiry_date?: string | null
+          id?: string
+          movement_type?: string
+          product_name?: string
+          quantity_after?: number
+          quantity_before?: number
+          quantity_change?: number
+          reason?: string
+          unit_buying_price?: number
+          user_id?: string
+        }
+        Relationships: []
+      }
       ecommerce_stores: {
         Row: { id: string; owner_user_id: string; slug: string; store_name: string; status: string; logo_url: string | null; brand_color: string; contact_phone: string; whatsapp_number: string; email: string; location: string; currency: string; created_at: string; updated_at: string }
         Insert: { id?: string; owner_user_id: string; slug: string; store_name: string; status?: string; logo_url?: string | null; brand_color?: string; contact_phone?: string; whatsapp_number?: string; email?: string; location?: string; currency?: string; created_at?: string; updated_at?: string }
@@ -507,6 +561,33 @@ export type Database = {
       current_clinic_owner_id: {
         Args: Record<PropertyKey, never>
         Returns: string
+      }
+      can_manage_clinic_inventory: {
+        Args: Record<PropertyKey, never>
+        Returns: boolean
+      }
+      add_inventory_batch: {
+        Args: {
+          p_buying_price?: number
+          p_date_of_purchase?: string | null
+          p_expiry_date?: string | null
+          p_low_stock_threshold?: number
+          p_name: string
+          p_reason?: string
+          p_selling_price?: number
+          p_serial_number?: string | null
+          p_stock_quantity?: number
+        }
+        Returns: string
+      }
+      record_inventory_stock_change: {
+        Args: {
+          p_drug_id: string
+          p_movement_type: string
+          p_quantity: number
+          p_reason: string
+        }
+        Returns: undefined
       }
       create_clinic_user_invite: {
         Args: {
