@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { Link } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -6,7 +7,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { DollarSign, Package2, Receipt, AlertTriangle, Download, type LucideIcon } from "lucide-react";
+import { AlertTriangle, CalendarClock, CheckCircle2, DollarSign, Download, Package2, PackagePlus, Receipt, type LucideIcon } from "lucide-react";
 import AppLayout from "@/components/AppLayout";
 import type { Tables } from "@/integrations/supabase/types";
 import {
@@ -81,26 +82,52 @@ const MetricCard = ({
   const classes = toneClasses[tone];
 
   return (
-    <Card className="overflow-hidden transition-shadow hover:shadow-md">
+    <Card className="overflow-hidden rounded-xl border-border/70 shadow-sm transition-all hover:-translate-y-0.5 hover:shadow-md">
       <div className={`h-1 ${classes.bar}`} />
       <CardHeader className="flex flex-row items-start justify-between gap-3 pb-2">
         <div className="min-w-0">
-          <CardTitle className="text-sm font-medium text-muted-foreground">{title}</CardTitle>
+          <CardTitle className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">{title}</CardTitle>
         </div>
         <div className={`rounded-md p-2 ${classes.icon}`}>
           <Icon className="h-4 w-4" />
         </div>
       </CardHeader>
       <CardContent>
-        <div className={`text-2xl font-bold tracking-tight ${classes.value}`}>{value}</div>
+        <div className={`break-words text-2xl font-bold leading-tight tracking-tight tabular-nums sm:text-3xl ${classes.value}`}>{value}</div>
         <p className="mt-1 text-xs leading-5 text-muted-foreground">{description}</p>
       </CardContent>
     </Card>
   );
 };
 
+const LiveClinicClock = () => {
+  const [now, setNow] = useState(() => new Date());
+
+  useEffect(() => {
+    const intervalId = window.setInterval(() => setNow(new Date()), 1_000);
+    return () => window.clearInterval(intervalId);
+  }, []);
+
+  return (
+    <div className="flex flex-wrap items-center gap-x-5 gap-y-2 text-sm">
+      <span className="inline-flex items-center gap-2 text-white/80">
+        <CalendarClock className="h-4 w-4 text-cyan-200" />
+        <time dateTime={now.toISOString()}>{formatClinicDate(now)}</time>
+      </span>
+      <time
+        dateTime={now.toISOString()}
+        aria-label={`Current clinic time ${formatClinicTime(now)}`}
+        className="font-mono text-base font-semibold tabular-nums text-white"
+        aria-live="off"
+      >
+        {formatClinicTime(now)}
+      </time>
+    </div>
+  );
+};
+
 const Dashboard = () => {
-  const { clinicOwnerId } = useAuth();
+  const { clinicOwnerId, profile, canAccessApp } = useAuth();
   const [drugs, setDrugs] = useState<Tables<"drugs">[]>([]);
   const [patients, setPatients] = useState<Tables<"patients">[]>([]);
   const [transactions, setTransactions] = useState<Tables<"transactions">[]>([]);
@@ -191,16 +218,18 @@ const Dashboard = () => {
   const outOfStockDrugs = drugs.filter((d) => !isExpiredDrug(d) && getSellableStockQuantity(d) === 0);
   const expiredDrugs = drugs.filter((d) => isExpiredDrug(d) && d.stock_quantity > 0);
   const expiringSoonDrugs = drugs.filter((d) => isExpiringSoonDrug(d) && d.stock_quantity > 0);
+  const expiringDrugs = expiringSoonDrugs.filter((drug) => !isExpiredDrug(drug));
+  const totalAttentionItems = lowStockDrugs.length + outOfStockDrugs.length + expiredDrugs.length + expiringDrugs.length;
   const sellableDrugs = drugs.filter((d) => d.stock_quantity > 0 && !isExpiredDrug(d));
   const totalInventoryLines = Math.max(drugs.length, 1);
   const visibleAlerts =
     alertFilter === "expired" ? expiredDrugs :
-    alertFilter === "expiring" ? expiringSoonDrugs.filter((d) => !isExpiredDrug(d)) :
+    alertFilter === "expiring" ? expiringDrugs :
     alertFilter === "out" ? outOfStockDrugs :
     alertFilter === "low" ? lowStockDrugs :
     [
       ...expiredDrugs,
-      ...expiringSoonDrugs.filter((d) => !isExpiredDrug(d)),
+      ...expiringDrugs,
       ...outOfStockDrugs,
       ...lowStockDrugs,
     ];
@@ -293,22 +322,55 @@ const Dashboard = () => {
   return (
     <AppLayout>
       <div className="space-y-4 sm:space-y-6">
-        <div className="rounded-lg border bg-card p-4 shadow-sm sm:p-6">
-          <div className="flex flex-col gap-5 lg:flex-row lg:items-end lg:justify-between">
+        <section className="relative isolate overflow-hidden rounded-2xl bg-gradient-to-br from-slate-950 via-cyan-950 to-primary px-5 py-6 text-white shadow-lg sm:px-8 sm:py-8">
+          <div aria-hidden="true" className="absolute -right-16 -top-24 -z-10 h-72 w-72 rounded-full bg-cyan-300/15 blur-3xl" />
+          <div className="flex flex-col gap-6 lg:flex-row lg:items-end lg:justify-between">
             <div className="min-w-0">
-              <div className="flex flex-wrap items-center gap-2">
-                <h2 className="text-2xl font-bold tracking-tight sm:text-3xl">Dashboard</h2>
-                <Badge variant="secondary">{rangeLabel}</Badge>
-              </div>
-              <p className="mt-1 text-sm text-muted-foreground">
-                Quick view of sales, stock health, and profit trends for {rangeLabel.toLowerCase()}.
+              <p className="text-xs font-semibold uppercase tracking-[0.2em] text-cyan-100/75">
+                {profile?.clinic_name || "Clinic overview"}
               </p>
-              <p className="mt-1 text-xs text-muted-foreground">{periodDescription}</p>
-              <div className="mt-3 inline-flex flex-col rounded-md border bg-muted/40 px-3 py-2 text-sm">
-                <span className="font-medium">Current Date: {formatClinicDate(now)}</span>
-                <span className="text-muted-foreground">Current Time: {formatClinicTime(now)}</span>
+              <h2 className="mt-2 text-2xl font-bold tracking-tight sm:text-3xl">
+                Welcome back{profile?.name?.trim() ? `, ${profile.name.trim()}` : ""}
+              </h2>
+              <p className="mt-2 max-w-2xl text-sm text-white/75">
+                Here’s how your clinic is doing today. Review sales, stock, and the items that need attention.
+              </p>
+              <div className="mt-5 flex flex-wrap items-center gap-x-5 gap-y-2">
+                <LiveClinicClock />
+                <Badge className="border-white/15 bg-white/10 text-white hover:bg-white/10">{rangeLabel}</Badge>
               </div>
             </div>
+            <div className="flex flex-col gap-2 sm:flex-row lg:shrink-0">
+              {canAccessApp("billing") && (
+                <Button asChild className="bg-white text-primary shadow-sm hover:bg-cyan-50">
+                  <Link to="/pharmacy/billing">
+                    <Receipt className="mr-2 h-4 w-4" />Record Sale
+                  </Link>
+                </Button>
+              )}
+              {canAccessApp("inventory") && (
+                <Button asChild variant="outline" className="border-white/30 bg-white/10 text-white hover:bg-white/20 hover:text-white">
+                  <Link to="/pharmacy/inventory" state={{ openAddBatch: true }}>
+                    <PackagePlus className="mr-2 h-4 w-4" />Add Stock
+                  </Link>
+                </Button>
+              )}
+            </div>
+          </div>
+        </section>
+
+        <div className="rounded-xl border bg-card p-4 shadow-sm sm:p-5">
+          <div className="mb-4 flex flex-col gap-1 sm:flex-row sm:items-end sm:justify-between">
+            <div>
+              <div className="flex flex-wrap items-center gap-2">
+                <h3 className="text-base font-semibold tracking-tight">Sales report</h3>
+                <Badge variant="secondary">{rangeLabel}</Badge>
+              </div>
+              <p className="mt-1 text-xs text-muted-foreground">{periodDescription}</p>
+            </div>
+            <p className="text-xs text-muted-foreground">Choose a period to update your figures and chart.</p>
+          </div>
+          <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
             <div className="grid grid-cols-2 gap-2 sm:flex sm:flex-wrap lg:justify-end">
               {([
                 { label: "Daily", value: "daily" },
@@ -430,6 +492,45 @@ const Dashboard = () => {
             tone="warning"
           />
         </div>
+
+        <Card className={`overflow-hidden rounded-xl ${totalAttentionItems > 0 ? "border-amber-300/80 bg-amber-50/40 dark:border-amber-900 dark:bg-amber-950/10" : "border-emerald-200/80 bg-emerald-50/30 dark:border-emerald-900 dark:bg-emerald-950/10"}`}>
+          <CardHeader className="flex flex-col gap-3 pb-3 sm:flex-row sm:items-center sm:justify-between">
+            <div className="flex items-center gap-3">
+              <div className={`rounded-lg p-2.5 ${totalAttentionItems > 0 ? "bg-amber-100 text-amber-800 dark:bg-amber-900/50 dark:text-amber-200" : "bg-emerald-100 text-emerald-800 dark:bg-emerald-900/50 dark:text-emerald-200"}`}>
+                {totalAttentionItems > 0 ? <AlertTriangle className="h-5 w-5" /> : <CheckCircle2 className="h-5 w-5" />}
+              </div>
+              <div>
+                <CardTitle className="text-base">Needs attention</CardTitle>
+                <p className="mt-1 text-sm text-muted-foreground">
+                  {totalAttentionItems > 0
+                    ? `${totalAttentionItems} stock issue${totalAttentionItems === 1 ? "" : "s"} to review`
+                    : "Your inventory has no low-stock or expiry alerts."}
+                </p>
+              </div>
+            </div>
+            {canAccessApp("inventory") && (
+              <Button asChild variant="outline" size="sm" className="w-full sm:w-auto">
+                <Link to="/pharmacy/inventory">Review inventory</Link>
+              </Button>
+            )}
+          </CardHeader>
+          <CardContent className="grid grid-cols-2 gap-3 pt-0 sm:grid-cols-4">
+            {[
+              { label: "Out of stock", value: outOfStockDrugs.length, tone: "text-destructive", marker: "bg-destructive" },
+              { label: "Low stock", value: lowStockDrugs.length, tone: "text-amber-700 dark:text-amber-300", marker: "bg-amber-500" },
+              { label: "Expired", value: expiredDrugs.length, tone: "text-destructive", marker: "bg-destructive" },
+              { label: "Expiring soon", value: expiringDrugs.length, tone: "text-amber-700 dark:text-amber-300", marker: "bg-amber-500" },
+            ].map((item) => (
+              <div key={item.label} className="flex items-center justify-between rounded-lg border bg-background/80 px-3 py-3">
+                <span className="flex items-center gap-2 text-xs font-medium text-muted-foreground sm:text-sm">
+                  <span aria-hidden="true" className={`h-2 w-2 rounded-full ${item.marker}`} />
+                  {item.label}
+                </span>
+                <span className={`text-lg font-bold tabular-nums ${item.tone}`}>{item.value}</span>
+              </div>
+            ))}
+          </CardContent>
+        </Card>
 
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-2">
           <Card>

@@ -1,4 +1,5 @@
 import { Fragment, useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useLocation, useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { logAudit } from "@/lib/audit";
@@ -64,6 +65,8 @@ type PendingSensitiveAction =
   | null;
 
 const DrugsPage = () => {
+  const location = useLocation();
+  const navigate = useNavigate();
   const {
     clinicOwnerId,
     role,
@@ -156,14 +159,22 @@ const DrugsPage = () => {
     setPendingSensitiveAction(null);
   };
 
-  const openAddDialog = (catalogItem?: DrugCatalogItem, existingProductName?: string) => {
+  const openAddDialog = useCallback((catalogItem?: DrugCatalogItem, existingProductName?: string) => {
     setEditingDrug(null);
     setForm({
       ...emptyDrugForm,
       name: existingProductName ?? catalogItem?.name ?? "",
     });
     setDialogOpen(true);
-  };
+  }, []);
+
+  useEffect(() => {
+    const navigationState = location.state as { openAddBatch?: boolean } | null;
+    if (!navigationState?.openAddBatch) return;
+
+    openAddDialog();
+    navigate(location.pathname, { replace: true, state: null });
+  }, [location.key, location.pathname, location.state, navigate, openAddDialog]);
 
   const openEditDialog = (drug: Tables<"drugs">) => {
     setEditingDrug(drug);
