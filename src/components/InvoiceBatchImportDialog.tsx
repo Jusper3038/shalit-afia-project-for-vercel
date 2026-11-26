@@ -37,7 +37,7 @@ const MAX_FILE_SIZE = 12 * 1024 * 1024;
 const MAX_PDF_PAGES = 20;
 const MAX_INVOICE_ROWS = 100;
 
-const normalizeName = (value: string) => value.toLowerCase().trim().replace(/\s+/g, " ");
+const normalizeName = (value: string) => value.toLowerCase().replace(/[^a-z0-9]+/g, " ").trim().replace(/\s+/g, " ");
 
 const normalizeYear = (value: string) => {
   if (value.length === 4) return value;
@@ -81,6 +81,14 @@ const getInvoiceDate = (text: string) => {
       const date = parseDate(line);
       if (date) return date;
     }
+  }
+  return "";
+};
+
+const getInvoiceReference = (text: string) => {
+  for (const line of text.split(/\r?\n/)) {
+    const match = line.match(/\b(?:tax\s+)?(?:invoice|inv)\s*(?:n[o0]|no\.?|number|#)\s*[:#=-]?\s*([a-z0-9][a-z0-9/-]{2,})/i);
+    if (match) return match[1].replace(/[.,;:]+$/, "");
   }
   return "";
 };
@@ -248,7 +256,7 @@ const InvoiceBatchImportDialog = ({ open, onOpenChange, inventory, onSaved }: Pr
     }
     setFiles(nextFiles);
     setRows([]);
-    setInvoiceReference(nextFiles[0].name.replace(/\.[^.]+$/, ""));
+    setInvoiceReference("");
   };
 
   const scanInvoice = async () => {
@@ -289,6 +297,10 @@ const InvoiceBatchImportDialog = ({ open, onOpenChange, inventory, onSaved }: Pr
       }
 
       const parsedRows = parseInvoiceRows(extractedText, inventory);
+      const extractedReference = getInvoiceReference(extractedText);
+      if (extractedReference) {
+        setInvoiceReference((current) => current.trim() ? current : extractedReference);
+      }
       if (!parsedRows.length) {
         toast.error("I couldn't find clear item rows. Try a sharper photo or add batches manually.");
         return;
@@ -327,6 +339,24 @@ const InvoiceBatchImportDialog = ({ open, onOpenChange, inventory, onSaved }: Pr
         toast.error(`Purchase date is after expiry date for “${row.name}”.`);
         return;
       }
+    }
+
+    const unmatchedNames = selectedRows.filter((row) =>
+      !inventory.some((drug) => normalizeName(drug.name) === normalizeName(row.name))
+    );
+    const existingBatches = selectedRows.filter((row) =>
+      row.serial_number.trim() && inventory.some((drug) =>
+        normalizeName(drug.name) === normalizeName(row.name) &&
+        (drug.serial_number ?? "").trim().toLowerCase() === row.serial_number.trim().toLowerCase() &&
+        drug.expiry_date === (row.expiry_date || null)
+      )
+    );
+    if (unmatchedNames.length || existingBatches.length) {
+      const warnings = [
+        unmatchedNames.length ? `${unmatchedNames.length} item name(s) do not match existing inventory and will create separate product group(s)` : "",
+        existingBatches.length ? `${existingBatches.length} batch(es) appear to already exist` : "",
+      ].filter(Boolean).join(". ");
+      if (!window.confirm(`${warnings}. Continue saving these rows?`)) return;
     }
 
     setSaving(true);
@@ -391,17 +421,18 @@ const InvoiceBatchImportDialog = ({ open, onOpenChange, inventory, onSaved }: Pr
           <div className="space-y-2">
             <Label htmlFor="invoice-reference">Invoice number / reference</Label>
             <Input id="invoice-reference" value={invoiceReference} onChange={(event) => setInvoiceReference(event.target.value)} maxLength={200} placeholder="Supplier invoice reference" />
+            <p className="text-xs text-muted-foreground">Filled from an invoice number label when OCR finds one; otherwise enter it from the document.</p>
           </div>
         </div>
 
         {rows.length > 0 ? (
           <>
             <div className="flex flex-wrap items-center justify-between gap-2 rounded-md border border-amber-300 bg-amber-50 p-3 text-sm text-amber-950">
-              <div className="flex items-start gap-2"><AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" /><span>OCR guesses may be wrong. Verify product, batch, dates, quantity, and prices; selling price for new products starts at cost.</span></div>
+              <div className="flex items-start gap-2"><AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" /><span>OCR guesses may be wrong. Verify product, batch, dates, quantity, and prices. Choose an existing product name when the invoice spelling differs; each saved row is added as a separate batch.</span></div>
               <span>{selectedCount} of {rows.length} selected</span>
             </div>
             <div className="overflow-x-auto rounded-md border">
-              <Table className="min-w-[1250px]">
+              <Table className="min-w-[1500px]">
                 <TableHeader><TableRow>
                   <TableHead className="w-10"><input type="checkbox" checked={selectedCount === rows.length} aria-label="Select all invoice items" onChange={(event) => setRows((current) => current.map((row) => ({ ...row, selected: event.target.checked })))} /></TableHead>
                   <TableHead>Product</TableHead><TableHead>Batch / Lot</TableHead><TableHead>Purchase date</TableHead><TableHead>Expiry date</TableHead><TableHead>Quantity</TableHead><TableHead>Buy price</TableHead><TableHead>Sell price</TableHead><TableHead>Low stock</TableHead><TableHead className="w-16">Review</TableHead><TableHead />
@@ -409,8 +440,8 @@ const InvoiceBatchImportDialog = ({ open, onOpenChange, inventory, onSaved }: Pr
                 <TableBody>{rows.map((row) => (
                   <TableRow key={row.id} data-state={!row.selected ? "inactive" : undefined}>
                     <TableCell><input type="checkbox" checked={row.selected} aria-label={`Select ${row.name}`} onChange={(event) => updateRow(row.id, "selected", event.target.checked)} /></TableCell>
-                    <TableCell><Input aria-label="Product name" value={row.name} onChange={(event) => updateRow(row.id, "name", event.target.value)} maxLength={120} /></TableCell>
-                    <TableCell><Input aria-label="Batch or lot number" value={row.serial_number} onChange={(event) => updateRow(row.id, "serial_number", event.target.value)} maxLength={120} /></TableCell>
+                    <TableCell className="min-w-56"><Input aria-label="Product name" list="invoice-existing-inventory-names" value={row.name} onChange={(event) => updateRow(row.id, "name", event.target.value)} maxLength={120} /></TableCell>
+                    <TableCell className="min-w-48"><Input aria-label="Batch or lot number" value={row.serial_number} onChange={(event) => updateRow(row.id, "serial_number", event.target.value)} maxLength={120} /></TableCell>
                     <TableCell><Input aria-label="Purchase date" type="date" value={row.date_of_purchase} onChange={(event) => updateRow(row.id, "date_of_purchase", event.target.value)} /></TableCell>
                     <TableCell><Input aria-label="Expiry date" type="date" value={row.expiry_date} onChange={(event) => updateRow(row.id, "expiry_date", event.target.value)} /></TableCell>
                     <TableCell><Input aria-label="Quantity" type="number" min="1" step="1" value={row.stock_quantity} onChange={(event) => updateRow(row.id, "stock_quantity", event.target.value)} className="w-24" /></TableCell>
@@ -422,6 +453,9 @@ const InvoiceBatchImportDialog = ({ open, onOpenChange, inventory, onSaved }: Pr
                   </TableRow>
                 ))}</TableBody>
               </Table>
+              <datalist id="invoice-existing-inventory-names">
+                {[...new Set(inventory.map((drug) => drug.name))].map((name) => <option key={name} value={name} />)}
+              </datalist>
             </div>
             <details className="text-sm text-muted-foreground">
               <summary className="cursor-pointer">Show original OCR lines</summary>
