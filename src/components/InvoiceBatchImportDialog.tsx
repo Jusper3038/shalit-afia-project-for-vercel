@@ -57,6 +57,16 @@ const parseDate = (value: string) => {
   const iso = normalized.match(/\b(20\d{2})[-/](\d{1,2})[-/](\d{1,2})\b/);
   if (iso) return makeValidDate(iso[1], iso[2], iso[3]);
 
+  const monthNames = ["jan", "feb", "mar", "apr", "may", "jun", "jul", "aug", "sep", "oct", "nov", "dec"];
+  const namedDate = normalized.match(/\b(\d{1,2})\s+([a-z]{3,9})\s+(20\d{2})\b|\b([a-z]{3,9})\s+(\d{1,2}),?\s+(20\d{2})\b/i);
+  if (namedDate) {
+    const day = namedDate[1] ?? namedDate[5];
+    const monthName = (namedDate[2] ?? namedDate[4]).slice(0, 3).toLowerCase();
+    const year = namedDate[3] ?? namedDate[6];
+    const month = monthNames.indexOf(monthName) + 1;
+    if (month > 0) return makeValidDate(year, String(month), day);
+  }
+
   const monthFirst = normalized.match(/\b(\d{1,2})[-/](\d{1,2})[-/](\d{2}|20\d{2})\b/);
   if (monthFirst) return makeValidDate(normalizeYear(monthFirst[3]), monthFirst[1], monthFirst[2]);
 
@@ -77,7 +87,7 @@ const DATE_PATTERN = String.raw`(?:20\d{2}[-/.]\d{1,2}[-/.]\d{1,2}|\d{1,2}[-/.]\
 const getInvoiceDate = (text: string) => {
   const lines = text.split(/\r?\n/);
   for (const line of lines) {
-    if (/invoice\s*date|date\s*of\s*invoice|\bdated\b/i.test(line)) {
+    if (/invoice\s*date|date\s*of\s*invoice|\bdated\b|^\s*date\s*[:#-]/i.test(line)) {
       const date = parseDate(line);
       if (date) return date;
     }
@@ -203,6 +213,39 @@ const renderPdfPages = async (file: File, onPage: (page: number, total: number) 
   return canvases;
 };
 
+const extractPdfText = async (file: File, onPage: (page: number, total: number) => void) => {
+  const [{ getDocument, GlobalWorkerOptions }, pdfWorker] = await Promise.all([
+    import("pdfjs-dist"),
+    import("pdfjs-dist/build/pdf.worker.min.mjs?url"),
+  ]);
+  GlobalWorkerOptions.workerSrc = pdfWorker.default;
+  const pdf = await getDocument({ data: await file.arrayBuffer() }).promise;
+  if (pdf.numPages > MAX_PDF_PAGES) throw new Error(`This PDF has ${pdf.numPages} pages. Split it into files with ${MAX_PDF_PAGES} pages or fewer.`);
+
+  const pageLines: string[] = [];
+  for (let pageNumber = 1; pageNumber <= pdf.numPages; pageNumber += 1) {
+    onPage(pageNumber, pdf.numPages);
+    const page = await pdf.getPage(pageNumber);
+    const content = await page.getTextContent();
+    const positionedItems = content.items.flatMap((item) => {
+      if (!("str" in item) || !item.str.trim()) return [];
+      return [{ text: item.str.trim(), x: item.transform[4], y: item.transform[5] }];
+    }).sort((a, b) => b.y - a.y || a.x - b.x);
+
+    const lines: { y: number; items: typeof positionedItems }[] = [];
+    for (const item of positionedItems) {
+      const line = lines.find((candidate) => Math.abs(candidate.y - item.y) <= 2);
+      if (line) line.items.push(item);
+      else lines.push({ y: item.y, items: [item] });
+    }
+    pageLines.push(...lines
+      .sort((a, b) => b.y - a.y)
+      .map((line) => line.items.sort((a, b) => a.x - b.x).map((item) => item.text).join(" ")));
+  }
+
+  return { text: pageLines.join("\n").trim(), pageCount: pdf.numPages };
+};
+
 const renderImage = async (file: File) => {
   const bitmap = await createImageBitmap(file);
   const scale = Math.min(1, 2200 / Math.max(bitmap.width, bitmap.height));
@@ -270,30 +313,40 @@ const InvoiceBatchImportDialog = ({ open, onOpenChange, inventory, onSaved }: Pr
     let worker: { recognize: (image: HTMLCanvasElement) => Promise<{ data: { text: string } }>; terminate: () => Promise<unknown> } | null = null;
     try {
       const canvases: HTMLCanvasElement[] = [];
+      let extractedText = "";
+      let totalPages = 0;
       for (const file of files) {
         if (file.type === "application/pdf") {
-          const pages = await renderPdfPages(file, (page, total) => setProgressLabel(`Preparing PDF page ${page} of ${total}…`));
-          canvases.push(...pages);
+          const pdfResult = await extractPdfText(file, (page, total) => setProgressLabel(`Reading PDF text page ${page} of ${total}…`));
+          totalPages += pdfResult.pageCount;
+          if (parseInvoiceRows(pdfResult.text, inventory).length > 0) {
+            extractedText += `\n${pdfResult.text}`;
+          } else {
+            const pages = await renderPdfPages(file, (page, total) => setProgressLabel(`Preparing scanned PDF page ${page} of ${total}…`));
+            canvases.push(...pages);
+          }
         } else {
           canvases.push(await renderImage(file));
+          totalPages += 1;
         }
       }
-      if (canvases.length > MAX_PDF_PAGES) throw new Error(`Choose up to ${MAX_PDF_PAGES} total invoice pages at a time.`);
+      if (totalPages > MAX_PDF_PAGES) throw new Error(`Choose up to ${MAX_PDF_PAGES} total invoice pages at a time.`);
 
-      const { createWorker } = await import("tesseract.js");
-      worker = await createWorker("eng", 1, {
-        logger: (message) => {
-          if (message.status === "recognizing text" && typeof message.progress === "number") {
-            setProgress(Math.round(message.progress * 100));
-            setProgressLabel("Reading invoice text on this device…");
-          }
-        },
-      });
-      let extractedText = "";
-      for (let index = 0; index < canvases.length; index += 1) {
-        setProgressLabel(`Reading invoice page ${index + 1} of ${canvases.length}…`);
-        const result = await worker.recognize(canvases[index]);
-        extractedText += `\n${result.data.text}`;
+      if (canvases.length) {
+        const { createWorker } = await import("tesseract.js");
+        worker = await createWorker("eng", 1, {
+          logger: (message) => {
+            if (message.status === "recognizing text" && typeof message.progress === "number") {
+              setProgress(Math.round(message.progress * 100));
+              setProgressLabel("Reading invoice text on this device…");
+            }
+          },
+        });
+        for (let index = 0; index < canvases.length; index += 1) {
+          setProgressLabel(`Reading invoice page ${index + 1} of ${canvases.length}…`);
+          const result = await worker.recognize(canvases[index]);
+          extractedText += `\n${result.data.text}`;
+        }
       }
 
       const parsedRows = parseInvoiceRows(extractedText, inventory);
