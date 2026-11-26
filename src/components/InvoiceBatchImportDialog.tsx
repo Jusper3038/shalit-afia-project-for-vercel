@@ -33,11 +33,49 @@ type Props = {
   onSaved: (batchCount: number) => void;
 };
 
-const MAX_FILE_SIZE = 12 * 1024 * 1024;
+const MAX_FILE_SIZE = 20 * 1024 * 1024;
 const MAX_PDF_PAGES = 20;
 const MAX_INVOICE_ROWS = 100;
 
 const normalizeName = (value: string) => value.toLowerCase().replace(/[^a-z0-9]+/g, " ").trim().replace(/\s+/g, " ");
+
+const getSimilarInventoryNames = (name: string, inventory: Tables<"drugs">[]) => {
+  const normalized = normalizeName(name);
+  const tokens = normalized.split(" ").filter(Boolean);
+  if (tokens.length < 2) return [];
+  const editDistance = (left: string, right: string) => {
+    const previous = Array.from({ length: right.length + 1 }, (_, index) => index);
+    for (let i = 1; i <= left.length; i += 1) {
+      let diagonal = previous[0];
+      previous[0] = i;
+      for (let j = 1; j <= right.length; j += 1) {
+        const above = previous[j];
+        previous[j] = Math.min(previous[j] + 1, previous[j - 1] + 1, diagonal + (left[i - 1] === right[j - 1] ? 0 : 1));
+        diagonal = above;
+      }
+    }
+    return previous[right.length];
+  };
+  const strength = (value: string) => normalizeName(value).match(/\b\d+(?:\.\d+)?\s*(?:mg|mcg|g|kg|ml|l|iu|units?|%)\b/g)?.join("|") ?? "";
+  const uniqueNames = [...new Set(inventory.map((drug) => drug.name))];
+  return uniqueNames.map((candidate) => {
+    const candidateNormalized = normalizeName(candidate);
+    if (!candidateNormalized || candidateNormalized === normalized) return null;
+    // Never suggest a different strength or suggest a strength-less name for one with a dose.
+    if (strength(name) !== strength(candidate)) return null;
+    const candidateTokens = candidateNormalized.split(" ").filter(Boolean);
+    const shared = tokens.filter((token) => candidateTokens.includes(token)).length;
+    const overlap = shared / Math.max(tokens.length, candidateTokens.length);
+    const firstToken = tokens[0];
+    const candidateFirstToken = candidateTokens[0];
+    const firstSimilarity = 1 - editDistance(firstToken, candidateFirstToken) / Math.max(firstToken.length, candidateFirstToken.length);
+    const closeFirstToken = firstToken.length >= 5 && firstSimilarity >= 0.75;
+    if ((shared < Math.min(2, tokens.length) || overlap < 0.5) && !closeFirstToken) return null;
+    return { name: candidate, score: overlap + (closeFirstToken ? firstSimilarity * 0.1 : 0) };
+  }).filter((candidate): candidate is { name: string; score: number } => candidate !== null)
+    .sort((a, b) => b.score - a.score)
+    .slice(0, 3);
+};
 
 const normalizeYear = (value: string) => {
   if (value.length === 4) return value;
@@ -189,7 +227,7 @@ const parseInvoiceRows = (text: string, inventory: Tables<"drugs">[]): InvoiceBa
   return drafts;
 };
 
-const renderPdfPages = async (file: File, onPage: (page: number, total: number) => void) => {
+const renderPdfPages = async (file: File, onPage: (page: number, total: number) => void, readPage: (canvas: HTMLCanvasElement) => Promise<void>) => {
   const [{ getDocument, GlobalWorkerOptions }, pdfWorker] = await Promise.all([
     import("pdfjs-dist"),
     import("pdfjs-dist/build/pdf.worker.min.mjs?url"),
@@ -197,7 +235,6 @@ const renderPdfPages = async (file: File, onPage: (page: number, total: number) 
   GlobalWorkerOptions.workerSrc = pdfWorker.default;
   const pdf = await getDocument({ data: await file.arrayBuffer() }).promise;
   if (pdf.numPages > MAX_PDF_PAGES) throw new Error(`This PDF has ${pdf.numPages} pages. Split it into files with ${MAX_PDF_PAGES} pages or fewer.`);
-  const canvases: HTMLCanvasElement[] = [];
   for (let pageNumber = 1; pageNumber <= pdf.numPages; pageNumber += 1) {
     onPage(pageNumber, pdf.numPages);
     const page = await pdf.getPage(pageNumber);
@@ -208,9 +245,13 @@ const renderPdfPages = async (file: File, onPage: (page: number, total: number) 
     canvas.width = Math.ceil(viewport.width);
     canvas.height = Math.ceil(viewport.height);
     await page.render({ canvas, viewport }).promise;
-    canvases.push(canvas);
+    try {
+      await readPage(canvas);
+    } finally {
+      canvas.width = 0;
+      canvas.height = 0;
+    }
   }
-  return canvases;
 };
 
 const extractPdfText = async (file: File, onPage: (page: number, total: number) => void) => {
@@ -269,6 +310,16 @@ const InvoiceBatchImportDialog = ({ open, onOpenChange, inventory, onSaved }: Pr
   const [progress, setProgress] = useState(0);
   const [progressLabel, setProgressLabel] = useState("");
   const selectedCount = useMemo(() => rows.filter((row) => row.selected).length, [rows]);
+  const duplicateNameCount = useMemo(() => {
+    const names = new Set<string>();
+    return rows.reduce((count, row) => {
+      if (!row.name || !names.has(row.name)) {
+        if (row.name) names.add(row.name);
+        return count;
+      }
+      return count + 1;
+    }, 0);
+  }, [rows]);
 
   useEffect(() => {
     if (!open) {
@@ -286,7 +337,7 @@ const InvoiceBatchImportDialog = ({ open, onOpenChange, inventory, onSaved }: Pr
     if (!selectedFiles?.length) return;
     const nextFiles = Array.from(selectedFiles);
     if (nextFiles.some((file) => file.size > MAX_FILE_SIZE)) {
-      toast.error("Each invoice file must be 12 MB or smaller.");
+      toast.error("Each invoice file must be 20 MB or smaller.");
       return;
     }
     if (nextFiles.some((file) => !file.type.startsWith("image/") && file.type !== "application/pdf")) {
@@ -312,40 +363,43 @@ const InvoiceBatchImportDialog = ({ open, onOpenChange, inventory, onSaved }: Pr
     setProgressLabel("Preparing invoice pages…");
     let worker: { recognize: (image: HTMLCanvasElement) => Promise<{ data: { text: string } }>; terminate: () => Promise<unknown> } | null = null;
     try {
-      const canvases: HTMLCanvasElement[] = [];
       let extractedText = "";
       let totalPages = 0;
+      const readCanvas = async (canvas: HTMLCanvasElement) => {
+        try {
+          if (!worker) {
+            const { createWorker } = await import("tesseract.js");
+            worker = await createWorker("eng", 1, {
+              logger: (message) => {
+                if (message.status === "recognizing text" && typeof message.progress === "number") {
+                  setProgress(Math.round(message.progress * 100));
+                  setProgressLabel("Reading invoice text on this device…");
+                }
+              },
+            });
+          }
+          const result = await worker.recognize(canvas);
+          extractedText += `\n${result.data.text}`;
+        } finally {
+          // Release each decoded page before preparing the next one, which helps on phones.
+          canvas.width = 0;
+          canvas.height = 0;
+        }
+      };
       for (const file of files) {
         if (file.type === "application/pdf") {
           const pdfResult = await extractPdfText(file, (page, total) => setProgressLabel(`Reading PDF text page ${page} of ${total}…`));
           totalPages += pdfResult.pageCount;
+          if (totalPages > MAX_PDF_PAGES) throw new Error(`Choose up to ${MAX_PDF_PAGES} total invoice pages at a time.`);
           if (parseInvoiceRows(pdfResult.text, inventory).length > 0) {
             extractedText += `\n${pdfResult.text}`;
           } else {
-            const pages = await renderPdfPages(file, (page, total) => setProgressLabel(`Preparing scanned PDF page ${page} of ${total}…`));
-            canvases.push(...pages);
+            await renderPdfPages(file, (page, total) => setProgressLabel(`Preparing scanned PDF page ${page} of ${total}…`), readCanvas);
           }
         } else {
-          canvases.push(await renderImage(file));
           totalPages += 1;
-        }
-      }
-      if (totalPages > MAX_PDF_PAGES) throw new Error(`Choose up to ${MAX_PDF_PAGES} total invoice pages at a time.`);
-
-      if (canvases.length) {
-        const { createWorker } = await import("tesseract.js");
-        worker = await createWorker("eng", 1, {
-          logger: (message) => {
-            if (message.status === "recognizing text" && typeof message.progress === "number") {
-              setProgress(Math.round(message.progress * 100));
-              setProgressLabel("Reading invoice text on this device…");
-            }
-          },
-        });
-        for (let index = 0; index < canvases.length; index += 1) {
-          setProgressLabel(`Reading invoice page ${index + 1} of ${canvases.length}…`);
-          const result = await worker.recognize(canvases[index]);
-          extractedText += `\n${result.data.text}`;
+          if (totalPages > MAX_PDF_PAGES) throw new Error(`Choose up to ${MAX_PDF_PAGES} total invoice pages at a time.`);
+          await readCanvas(await renderImage(file));
         }
       }
 
@@ -371,6 +425,22 @@ const InvoiceBatchImportDialog = ({ open, onOpenChange, inventory, onSaved }: Pr
 
   const updateRow = (id: string, key: keyof InvoiceBatchDraft, value: string | boolean) => {
     setRows((current) => current.map((row) => row.id === id ? { ...row, [key]: value } : row));
+  };
+
+  const removeDuplicateNames = () => {
+    if (!duplicateNameCount) return;
+    const confirmed = window.confirm(`Remove ${duplicateNameCount} row(s) whose product name exactly matches an earlier row? This keeps the first row for each exact name. Different batches of the same product may have different batch numbers or expiry dates, so check the invoice first.`);
+    if (!confirmed) return;
+    setRows((current) => {
+      const seen = new Set<string>();
+      return current.filter((row) => {
+        if (!row.name) return true;
+        if (seen.has(row.name)) return false;
+        seen.add(row.name);
+        return true;
+      });
+    });
+    toast.success(`Removed ${duplicateNameCount} exact duplicate product-name row(s).`);
   };
 
   const saveBatches = async () => {
@@ -457,7 +527,7 @@ const InvoiceBatchImportDialog = ({ open, onOpenChange, inventory, onSaved }: Pr
                 {scanning ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <ScanLine className="mr-2 h-4 w-4" />}
                 {scanning ? "Reading invoice…" : rows.length ? "Read again" : "Read all items"}
               </Button>
-              <span className="text-xs text-muted-foreground">Up to 10 files / 20 PDF pages, 12 MB per file</span>
+              <span className="text-xs text-muted-foreground">Up to 10 files / 20 PDF pages, 20 MB per file</span>
             </div>
             {files.length > 0 && (
               <div className="flex flex-wrap gap-2">
@@ -484,6 +554,12 @@ const InvoiceBatchImportDialog = ({ open, onOpenChange, inventory, onSaved }: Pr
               <div className="flex items-start gap-2"><AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" /><span>OCR guesses may be wrong. Verify product, batch, dates, quantity, and prices. Choose an existing product name when the invoice spelling differs; each saved row is added as a separate batch.</span></div>
               <span>{selectedCount} of {rows.length} selected</span>
             </div>
+            <div className="flex flex-wrap items-center gap-2">
+              <Button type="button" variant="outline" size="sm" onClick={removeDuplicateNames} disabled={!duplicateNameCount || scanning || saving}>
+                <Trash2 className="mr-2 h-4 w-4" />Remove exact-name duplicates ({duplicateNameCount})
+              </Button>
+              <span className="text-xs text-muted-foreground">Keeps the first row for each exactly matching product name.</span>
+            </div>
             <div className="overflow-x-auto rounded-md border">
               <Table className="min-w-[1500px]">
                 <TableHeader><TableRow>
@@ -493,7 +569,27 @@ const InvoiceBatchImportDialog = ({ open, onOpenChange, inventory, onSaved }: Pr
                 <TableBody>{rows.map((row) => (
                   <TableRow key={row.id} data-state={!row.selected ? "inactive" : undefined}>
                     <TableCell><input type="checkbox" checked={row.selected} aria-label={`Select ${row.name}`} onChange={(event) => updateRow(row.id, "selected", event.target.checked)} /></TableCell>
-                    <TableCell className="min-w-56"><Input aria-label="Product name" list="invoice-existing-inventory-names" value={row.name} onChange={(event) => updateRow(row.id, "name", event.target.value)} maxLength={120} /></TableCell>
+                    <TableCell className="min-w-56">
+                      <Input aria-label="Product name" list="invoice-existing-inventory-names" value={row.name} onChange={(event) => updateRow(row.id, "name", event.target.value)} maxLength={120} />
+                      {getSimilarInventoryNames(row.name, inventory).length > 0 && (
+                        <div className="mt-1 max-w-56 text-xs text-muted-foreground">
+                          <span>Similar inventory names (choose only if same medicine and strength):</span>
+                          <div className="mt-1 flex flex-wrap gap-1">
+                            {getSimilarInventoryNames(row.name, inventory).map((match) => (
+                              <Button key={match.name} type="button" variant="outline" size="sm" className="h-auto whitespace-normal px-2 py-1 text-xs" onClick={() => {
+                                const drug = inventory.find((item) => item.name === match.name);
+                                setRows((current) => current.map((item) => item.id === row.id ? {
+                                  ...item,
+                                  name: match.name,
+                                  selling_price: String(drug?.selling_price ?? item.selling_price),
+                                  low_stock_threshold: String(drug?.low_stock_threshold ?? item.low_stock_threshold),
+                                } : item));
+                              }}>{match.name}</Button>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+                    </TableCell>
                     <TableCell className="min-w-48"><Input aria-label="Batch or lot number" value={row.serial_number} onChange={(event) => updateRow(row.id, "serial_number", event.target.value)} maxLength={120} /></TableCell>
                     <TableCell><Input aria-label="Purchase date" type="date" value={row.date_of_purchase} onChange={(event) => updateRow(row.id, "date_of_purchase", event.target.value)} /></TableCell>
                     <TableCell><Input aria-label="Expiry date" type="date" value={row.expiry_date} onChange={(event) => updateRow(row.id, "expiry_date", event.target.value)} /></TableCell>

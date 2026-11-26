@@ -1,4 +1,4 @@
-import { Suspense, lazy, useCallback, useEffect, useRef, useState } from "react";
+import { Suspense, lazy, useEffect, useState } from "react";
 import { NavLink, useLocation, useNavigate } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
 import { Button } from "@/components/ui/button";
@@ -52,8 +52,6 @@ const AppLayout = ({ children }: { children: React.ReactNode }) => {
   const [desktopSidebarOpen, setDesktopSidebarOpen] = useState(true);
   const [pharmacyExpanded, setPharmacyExpanded] = useState(false);
   const [ownerGreeting, setOwnerGreeting] = useState<string | null>(null);
-  const idleCollapseTimeoutRef = useRef<number | null>(null);
-  const sidebarHoveredRef = useRef(false);
   const visibleNavItems = navItems.filter((item) => {
     if (item.platformOnly) return isPlatformOwner;
     if (item.release && !isAppReleased(item.release)) return false;
@@ -69,51 +67,6 @@ const AppLayout = ({ children }: { children: React.ReactNode }) => {
   const selectedPharmacyModule = visiblePharmacyNavItems.some((item) => item.to === location.pathname);
   const displayRole = isPlatformOwner ? "System Owner" : role === "admin" ? "Clinic Owner" : "Team Member";
 
-  const clearIdleCollapseTimer = useCallback(() => {
-    if (idleCollapseTimeoutRef.current) {
-      window.clearTimeout(idleCollapseTimeoutRef.current);
-      idleCollapseTimeoutRef.current = null;
-    }
-  }, []);
-
-  const scheduleIdleCollapse = useCallback(() => {
-    clearIdleCollapseTimer();
-
-    if (!desktopSidebarOpen || sidebarHoveredRef.current) return;
-
-    idleCollapseTimeoutRef.current = window.setTimeout(() => {
-      if (!sidebarHoveredRef.current) setDesktopSidebarOpen(false);
-    }, 10_000);
-  }, [clearIdleCollapseTimer, desktopSidebarOpen]);
-
-  const handleSidebarInteraction = useCallback(() => {
-    scheduleIdleCollapse();
-  }, [scheduleIdleCollapse]);
-
-  const openDesktopSidebar = () => {
-    sidebarHoveredRef.current = false;
-    setDesktopSidebarOpen(true);
-  };
-
-  const closeDesktopSidebar = () => {
-    clearIdleCollapseTimer();
-    setDesktopSidebarOpen(false);
-  };
-
-  const handleSidebarMouseEnter = () => {
-    sidebarHoveredRef.current = true;
-    clearIdleCollapseTimer();
-    setDesktopSidebarOpen(true);
-  };
-
-  const handleSidebarMouseLeave = () => {
-    sidebarHoveredRef.current = false;
-    clearIdleCollapseTimer();
-    idleCollapseTimeoutRef.current = window.setTimeout(() => {
-      setDesktopSidebarOpen(false);
-    }, 500);
-  };
-
   const handlePharmacyClick = () => {
     setPharmacyExpanded((expanded) => !expanded);
 
@@ -127,12 +80,6 @@ const AppLayout = ({ children }: { children: React.ReactNode }) => {
       setPharmacyExpanded(true);
     }
   }, [isPharmacyRoute]);
-
-  useEffect(() => {
-    scheduleIdleCollapse();
-
-    return clearIdleCollapseTimer;
-  }, [clearIdleCollapseTimer, scheduleIdleCollapse]);
 
   useEffect(() => {
     const shouldShowGreeting = sessionStorage.getItem("show_owner_greeting") === "true";
@@ -167,13 +114,6 @@ const AppLayout = ({ children }: { children: React.ReactNode }) => {
 
       {/* Sidebar */}
       <aside
-        onMouseEnter={handleSidebarMouseEnter}
-        onMouseLeave={(event) => {
-          if (event.currentTarget.contains(event.relatedTarget as Node | null)) return;
-          handleSidebarMouseLeave();
-        }}
-        onMouseDown={handleSidebarInteraction}
-        onFocus={handleSidebarInteraction}
         className={`fixed inset-y-0 left-0 z-50 flex w-72 transform flex-col border-r border-white/10 bg-sidebar text-sidebar-foreground shadow-xl transition-[width,transform] duration-300 lg:sticky lg:top-0 lg:h-screen lg:translate-x-0 lg:shadow-[12px_0_28px_rgba(15,23,42,0.12)] ${desktopSidebarOpen ? "lg:w-72" : "lg:w-16"} ${
           sidebarOpen ? "translate-x-0" : "-translate-x-full"
         }`}
@@ -188,7 +128,7 @@ const AppLayout = ({ children }: { children: React.ReactNode }) => {
             variant="ghost"
             size="icon"
             className={cn("ml-auto hidden rounded-md border border-white/10 bg-white/[0.04] text-sidebar-foreground hover:bg-white/10 hover:text-white lg:inline-flex", !desktopSidebarOpen && "lg:ml-0")}
-            onClick={() => desktopSidebarOpen ? closeDesktopSidebar() : openDesktopSidebar()}
+            onClick={() => setDesktopSidebarOpen((open) => !open)}
             aria-label={desktopSidebarOpen ? "Collapse sidebar to icons" : "Expand sidebar"}
             title={desktopSidebarOpen ? "Collapse sidebar" : "Expand sidebar"}
           >
@@ -210,10 +150,7 @@ const AppLayout = ({ children }: { children: React.ReactNode }) => {
             <NavLink
               key={item.to}
               to={item.to}
-              onClick={() => {
-                handleSidebarInteraction();
-                setSidebarOpen(false);
-              }}
+              onClick={() => setSidebarOpen(false)}
               className={({ isActive }) =>
                 cn(
                   "group flex min-h-11 items-center gap-3 rounded-md px-3 py-2 text-sm font-semibold transition-all",
@@ -262,10 +199,7 @@ const AppLayout = ({ children }: { children: React.ReactNode }) => {
                     <NavLink
                       key={item.to}
                       to={item.to}
-                      onClick={() => {
-                        handleSidebarInteraction();
-                        setSidebarOpen(false);
-                      }}
+                      onClick={() => setSidebarOpen(false)}
                       className={({ isActive }) =>
                         cn(
                           "flex min-h-10 items-center gap-3 rounded-md px-3 py-2 text-sm font-semibold transition-all",

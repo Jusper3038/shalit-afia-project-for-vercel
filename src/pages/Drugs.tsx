@@ -37,6 +37,16 @@ type InventoryMovementType = "delivery" | "correction" | "write_off";
 
 const normalizeSearchText = (value: string) =>
   value.toLowerCase().trim().replace(/\s+/g, " ");
+const getExactBatchKey = (drug: Tables<"drugs">) => JSON.stringify([
+  drug.name,
+  drug.serial_number,
+  drug.expiry_date,
+  drug.date_of_purchase,
+  drug.buying_price,
+  drug.selling_price,
+  drug.stock_quantity,
+  drug.low_stock_threshold,
+]);
 const INVENTORY_SUGGESTION_MIN_CHARS = 2;
 const INVENTORY_SUGGESTION_DEBOUNCE_MS = 200;
 
@@ -62,6 +72,7 @@ type PendingSensitiveAction =
   | { type: "edit"; drug: Tables<"drugs"> }
   | { type: "delete"; drug: Tables<"drugs"> }
   | { type: "movement"; drug: Tables<"drugs"> }
+  | { type: "dedupe" }
   | null;
 
 const DrugsPage = () => {
@@ -83,6 +94,7 @@ const DrugsPage = () => {
   const [editingDrug, setEditingDrug] = useState<Tables<"drugs"> | null>(null);
   const [form, setForm] = useState(emptyDrugForm);
   const [savingDrug, setSavingDrug] = useState(false);
+  const [deletingDuplicates, setDeletingDuplicates] = useState(false);
   const [movementDialogOpen, setMovementDialogOpen] = useState(false);
   const [movementDrug, setMovementDrug] = useState<Tables<"drugs"> | null>(null);
   const [movementType, setMovementType] = useState<InventoryMovementType>("delivery");
@@ -104,7 +116,7 @@ const DrugsPage = () => {
   const [isInventorySearchFocused, setIsInventorySearchFocused] = useState(false);
   const [highlightedDrugId, setHighlightedDrugId] = useState<string | null>(null);
   const [expandedProducts, setExpandedProducts] = useState<Record<string, boolean>>({});
-  const inventoryRowRefs = useRef<Record<string, HTMLTableRowElement | null>>({});
+  const inventoryRowRefs = useRef<Record<string, HTMLElement | null>>({});
   const highlightTimeoutRef = useRef<number | null>(null);
 
   const fetchDrugs = useCallback(async () => {
@@ -294,6 +306,11 @@ const DrugsPage = () => {
     if (!action) return;
 
     if (isSensitiveAccessVerified()) {
+      if (action.type === "dedupe") {
+        void deleteExactDuplicateBatches();
+        return;
+      }
+
       if (action.type === "edit") {
         openEditDialog(action.drug);
         return;
@@ -487,6 +504,53 @@ const DrugsPage = () => {
       .sort((a, b) => a.name.localeCompare(b.name));
   }, [drugs]);
 
+  const exactDuplicateBatches = useMemo(() => {
+    const firstByKey = new Map<string, Tables<"drugs">>();
+    const duplicates: { keeper: Tables<"drugs">; duplicate: Tables<"drugs"> }[] = [];
+    [...drugs].sort((a, b) => a.created_at.localeCompare(b.created_at)).forEach((drug) => {
+      const key = getExactBatchKey(drug);
+      const keeper = firstByKey.get(key);
+      if (keeper) duplicates.push({ keeper, duplicate: drug });
+      else firstByKey.set(key, drug);
+    });
+    return duplicates;
+  }, [drugs]);
+
+  const deleteExactDuplicateBatches = async () => {
+    if (!clinicOwnerId || !exactDuplicateBatches.length || deletingDuplicates) return;
+    const duplicateCount = exactDuplicateBatches.length;
+    const confirmed = window.confirm(
+      `Delete ${duplicateCount} exact duplicate batch record(s), keeping the oldest copy? A match requires the exact same product name, batch number, dates, prices, stock quantity, and low-stock setting. Any sales, stock history, and online product links will be kept and relinked to the retained batch. Review the list first if two genuinely separate deliveries have identical details.`
+    );
+    if (!confirmed) return;
+
+    setDeletingDuplicates(true);
+    try {
+      const duplicateIds = exactDuplicateBatches.map(({ duplicate }) => duplicate.id);
+      const { data: deletedCount, error } = await supabase.rpc("delete_exact_duplicate_inventory_batches", {
+        p_duplicate_ids: duplicateIds,
+      });
+      if (error) throw error;
+      await logAudit("Removed exact duplicate inventory batches", `Deleted ${deletedCount ?? duplicateCount} exact duplicate batch record(s); linked sales, stock history, and online products were relinked to the retained records.`);
+      toast.success(`Removed ${deletedCount ?? duplicateCount} exact duplicate batch record(s).`);
+      await fetchDrugs();
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Could not remove exact duplicate batches. Refresh inventory and try again.");
+      await fetchDrugs();
+    } finally {
+      setDeletingDuplicates(false);
+    }
+  };
+
+  const usableUnitCount = drugs.reduce((total, drug) => total + getSellableStockQuantity(drug), 0);
+  const attentionBatchCount = drugs.filter((drug) => {
+    const usable = getSellableStockQuantity(drug);
+    return (isExpiredDrug(drug) && drug.stock_quantity > 0)
+      || (isExpiringSoonDrug(drug) && !isExpiredDrug(drug) && drug.stock_quantity > 0)
+      || (usable === 0 && drug.stock_quantity === 0)
+      || (usable > 0 && usable <= drug.low_stock_threshold);
+  }).length;
+
   const handleVerifySensitiveAction = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!pendingSensitiveAction) return;
@@ -518,6 +582,11 @@ const DrugsPage = () => {
       return;
     }
 
+    if (action.type === "dedupe") {
+      await deleteExactDuplicateBatches();
+      return;
+    }
+
     await performDelete(action.drug);
   };
 
@@ -542,7 +611,9 @@ const DrugsPage = () => {
     ? "delete this batch"
     : pendingSensitiveAction?.type === "movement"
       ? "record a stock movement"
-      : "edit this batch";
+      : pendingSensitiveAction?.type === "dedupe"
+        ? "delete exact duplicate batches"
+        : "edit this batch";
 
   useEffect(() => {
     return () => {
@@ -556,13 +627,19 @@ const DrugsPage = () => {
     <AppLayout>
       <div className="space-y-4">
         <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-          <h2 className="text-2xl font-bold">Inventory</h2>
+          <div>
+            <h2 className="text-2xl font-bold tracking-tight">Inventory</h2>
+            <p className="mt-1 text-sm text-muted-foreground">Track products by batch, monitor expiry, and keep stock levels healthy.</p>
+          </div>
           <div className="flex flex-wrap gap-2">
             <Button className="w-full sm:w-auto" variant="outline" size="sm" onClick={() => exportToCSV(drugs.map(d => ({ Name: d.name, "Serial Number": d.serial_number ?? "", "Expiry Date": d.expiry_date ?? "", "Date of Purchase": d.date_of_purchase ?? "", "Buying Price": d.buying_price, "Selling Price": d.selling_price, "Usable Stock": getSellableStockQuantity(d), "Physical Stock": d.stock_quantity, "Expired Stock Loss": getExpiredStockCostLoss(d) })), "drugs-report")}>
               <Download className="mr-2 h-4 w-4" />CSV
             </Button>
             <Button className="w-full sm:w-auto" variant="outline" size="sm" onClick={() => openMovementHistory()}>
               <History className="mr-2 h-4 w-4" />Stock History
+            </Button>
+            <Button className="w-full sm:w-auto" variant="destructive" size="sm" onClick={() => requestSensitiveAction({ type: "dedupe" })} disabled={!exactDuplicateBatches.length || deletingDuplicates || loading}>
+              <Trash2 className="mr-2 h-4 w-4" />{deletingDuplicates ? "Removing duplicates…" : `Delete exact duplicates (${exactDuplicateBatches.length})`}
             </Button>
             <Button className="w-full sm:w-auto" variant="outline" size="sm" onClick={() => setInvoiceImportOpen(true)}>
               <Search className="mr-2 h-4 w-4" />Scan Invoice
@@ -617,6 +694,27 @@ const DrugsPage = () => {
             </Dialog>
           </div>
         </div>
+
+        {!loading && (
+          <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+            {[
+              { label: "Products", value: groupedProducts.length, icon: <ListPlus className="h-4 w-4" />, color: "text-primary bg-primary/10" },
+              { label: "Batches", value: drugs.length, icon: <PackagePlus className="h-4 w-4" />, color: "text-sky-700 bg-sky-100 dark:text-sky-200 dark:bg-sky-900/40" },
+              { label: "Usable units", value: usableUnitCount.toLocaleString(), icon: <History className="h-4 w-4" />, color: "text-emerald-700 bg-emerald-100 dark:text-emerald-200 dark:bg-emerald-900/40" },
+              { label: "Need review", value: attentionBatchCount, icon: <Search className="h-4 w-4" />, color: attentionBatchCount > 0 ? "text-amber-800 bg-amber-100 dark:text-amber-200 dark:bg-amber-900/40" : "text-emerald-700 bg-emerald-100 dark:text-emerald-200 dark:bg-emerald-900/40" },
+            ].map((item) => (
+              <Card key={item.label} className="rounded-xl border-border/70 shadow-sm">
+                <CardContent className="flex items-center gap-3 p-3 sm:p-4">
+                  <div className={`rounded-lg p-2 ${item.color}`}>{item.icon}</div>
+                  <div className="min-w-0">
+                    <p className="truncate text-xs font-medium text-muted-foreground sm:text-sm">{item.label}</p>
+                    <p className="text-xl font-bold tabular-nums sm:text-2xl">{item.value}</p>
+                  </div>
+                </CardContent>
+              </Card>
+            ))}
+          </div>
+        )}
 
         <div className="grid gap-4 xl:grid-cols-[0.95fr_1.05fr]">
           <Card>
@@ -709,7 +807,7 @@ const DrugsPage = () => {
         </div>
 
         <Card>
-          <CardContent className="overflow-x-auto p-0">
+          <CardContent className="p-0">
             {inventoryLoadError && (
               <div className="flex flex-wrap items-center justify-between gap-3 border-b p-4" role="alert">
                 <p className="text-sm text-destructive">{inventoryLoadError}</p>
@@ -723,6 +821,8 @@ const DrugsPage = () => {
             ) : drugs.length === 0 ? (
               <div className="p-6 text-center text-muted-foreground">No products yet. Click "Receive New Batch" to get started.</div>
             ) : (
+              <>
+              <div className="hidden overflow-x-auto lg:block">
               <Table className="min-w-[760px]">
                 <TableHeader>
                   <TableRow>
@@ -839,6 +939,108 @@ const DrugsPage = () => {
                   })}
                 </TableBody>
               </Table>
+              </div>
+
+              <div className="space-y-3 p-3 lg:hidden">
+                {groupedProducts.map((product) => {
+                  const expanded = Boolean(expandedProducts[product.key]);
+                  const usableStock = product.batches.reduce((total, batch) => total + getSellableStockQuantity(batch), 0);
+                  const physicalStock = product.batches.reduce((total, batch) => total + batch.stock_quantity, 0);
+                  const lowStockBatches = product.batches.filter((batch) => {
+                    const usable = getSellableStockQuantity(batch);
+                    return usable > 0 && usable <= batch.low_stock_threshold;
+                  }).length;
+                  const expiredBatches = product.batches.filter((batch) => isExpiredDrug(batch) && batch.stock_quantity > 0).length;
+
+                  return (
+                    <article key={product.key} className="overflow-hidden rounded-xl border bg-card shadow-sm">
+                      <div className="flex items-center gap-2 p-3">
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="icon"
+                          className="h-9 w-9 shrink-0"
+                          aria-label={`${expanded ? "Collapse" : "Expand"} ${product.name} batches`}
+                          aria-expanded={expanded}
+                          onClick={() => setExpandedProducts((current) => ({ ...current, [product.key]: !current[product.key] }))}
+                        >
+                          {expanded ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
+                        </Button>
+                        <button
+                          type="button"
+                          className="min-w-0 flex-1 text-left"
+                          aria-expanded={expanded}
+                          onClick={() => setExpandedProducts((current) => ({ ...current, [product.key]: !current[product.key] }))}
+                        >
+                          <span className="block truncate font-semibold">{product.name}</span>
+                          <span className="text-xs text-muted-foreground">{product.batches.length} batch{product.batches.length === 1 ? "" : "es"}</span>
+                        </button>
+                        <Button
+                          type="button"
+                          variant="outline"
+                          size="icon"
+                          className="h-9 w-9 shrink-0"
+                          title={`Receive another ${product.name} batch`}
+                          aria-label={`Receive another ${product.name} batch`}
+                          onClick={() => openAddDialog(undefined, product.name)}
+                        >
+                          <PackagePlus className="h-4 w-4" />
+                        </Button>
+                      </div>
+                      <div className="grid grid-cols-2 gap-2 border-t bg-muted/20 p-3">
+                        <div className="rounded-lg border bg-background p-2.5">
+                          <p className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">Usable stock</p>
+                          <p className="mt-1 text-lg font-bold tabular-nums">{usableStock.toLocaleString()}</p>
+                        </div>
+                        <div className="rounded-lg border bg-background p-2.5">
+                          <p className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">Physical stock</p>
+                          <p className="mt-1 text-lg font-bold tabular-nums">{physicalStock.toLocaleString()}</p>
+                        </div>
+                      </div>
+                      <div className="flex flex-wrap gap-2 px-3 pb-3">
+                        {usableStock > 0 && lowStockBatches === 0 && <Badge className="bg-emerald-100 text-emerald-800 hover:bg-emerald-100 dark:bg-emerald-900/40 dark:text-emerald-200">In Stock</Badge>}
+                        {lowStockBatches > 0 && <Badge className="bg-amber-100 text-amber-900 hover:bg-amber-100 dark:bg-amber-900/40 dark:text-amber-200">{lowStockBatches} low batch{lowStockBatches === 1 ? "" : "es"}</Badge>}
+                        {expiredBatches > 0 && <Badge variant="destructive">{expiredBatches} expired</Badge>}
+                        {usableStock === 0 && physicalStock === 0 && <Badge variant="destructive">Out of stock</Badge>}
+                      </div>
+                      {expanded && (
+                        <div className="space-y-3 border-t bg-muted/20 p-3">
+                          {product.batches.map((batch) => (
+                            <article
+                              key={batch.id}
+                              ref={(element) => { inventoryRowRefs.current[batch.id] = element; }}
+                              className={`scroll-mt-4 space-y-3 rounded-lg border bg-background p-3 ${highlightedDrugId === batch.id ? "border-primary bg-accent/40 ring-2 ring-primary/30" : ""}`}
+                            >
+                              <div className="flex flex-wrap items-start justify-between gap-2">
+                                <div className="min-w-0">
+                                  <p className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">Batch / Lot</p>
+                                  <p className="break-all font-semibold">{batch.serial_number || "No batch number"}</p>
+                                </div>
+                                <div className="flex flex-wrap gap-1.5">{getStockBadge(batch)}{getExpiryBadge(batch)}</div>
+                              </div>
+                              <div className="grid grid-cols-2 gap-x-3 gap-y-2 text-sm">
+                                <div><p className="text-xs text-muted-foreground">Usable</p><p className="font-semibold tabular-nums">{getSellableStockQuantity(batch)}</p></div>
+                                <div><p className="text-xs text-muted-foreground">Physical</p><p className="font-semibold tabular-nums">{batch.stock_quantity}</p></div>
+                                <div><p className="text-xs text-muted-foreground">Expires</p><p className="font-medium">{formatDate(batch.expiry_date)}</p></div>
+                                <div><p className="text-xs text-muted-foreground">Purchased</p><p className="font-medium">{formatDate(batch.date_of_purchase)}</p></div>
+                                <div><p className="text-xs text-muted-foreground">Buy price</p><p className="font-medium">KSh {Number(batch.buying_price).toLocaleString()}</p></div>
+                                <div><p className="text-xs text-muted-foreground">Sell price</p><p className="font-medium">KSh {Number(batch.selling_price).toLocaleString()}</p></div>
+                              </div>
+                              <div className="flex justify-end gap-1 border-t pt-2">
+                                <Button variant="ghost" size="icon" title="View batch movement history" aria-label={`Movement history for ${product.name}, batch ${batch.serial_number || "without batch number"}`} onClick={() => openMovementHistory(batch)}><History className="h-4 w-4" /></Button>
+                                <Button variant="ghost" size="icon" title="Receive, correct, or write off this batch" aria-label={`Stock actions for ${product.name}, batch ${batch.serial_number || "without batch number"}`} onClick={() => handleStockAction(batch)}><PackagePlus className="h-4 w-4" /></Button>
+                                <Button variant="ghost" size="icon" title="Edit batch details" aria-label={`Edit ${product.name} batch ${batch.serial_number || "without batch number"}`} onClick={() => handleEdit(batch)}><Pencil className="h-4 w-4" /></Button>
+                                <Button variant="ghost" size="icon" title="Delete empty batch" aria-label={`Delete ${product.name} batch ${batch.serial_number || "without batch number"}`} onClick={() => handleDelete(batch)}><Trash2 className="h-4 w-4" /></Button>
+                              </div>
+                            </article>
+                          ))}
+                        </div>
+                      )}
+                    </article>
+                  );
+                })}
+              </div>
+              </>
             )}
           </CardContent>
         </Card>

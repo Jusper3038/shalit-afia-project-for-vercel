@@ -611,6 +611,12 @@ export type Database = {
         }
         Returns: string[]
       }
+      delete_exact_duplicate_inventory_batches: {
+        Args: {
+          p_duplicate_ids: string[]
+        }
+        Returns: number
+      }
       record_inventory_stock_change: {
         Args: {
           p_drug_id: string
