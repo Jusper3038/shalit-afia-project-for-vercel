@@ -4,6 +4,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import { logAudit } from "@/lib/audit";
 import { exportToCSV } from "@/lib/csv-export";
 import AppLayout from "@/components/AppLayout";
+import InvoiceBatchImportDialog from "@/components/InvoiceBatchImportDialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { PasswordInput } from "@/components/ui/password-input";
@@ -74,6 +75,7 @@ const DrugsPage = () => {
   const [drugs, setDrugs] = useState<Tables<"drugs">[]>([]);
   const [loading, setLoading] = useState(true);
   const [dialogOpen, setDialogOpen] = useState(false);
+  const [invoiceImportOpen, setInvoiceImportOpen] = useState(false);
   const [editingDrug, setEditingDrug] = useState<Tables<"drugs"> | null>(null);
   const [form, setForm] = useState(emptyDrugForm);
   const [savingDrug, setSavingDrug] = useState(false);
@@ -527,6 +529,9 @@ const DrugsPage = () => {
             <Button className="w-full sm:w-auto" variant="outline" size="sm" onClick={() => openMovementHistory()}>
               <History className="mr-2 h-4 w-4" />Stock History
             </Button>
+            <Button className="w-full sm:w-auto" variant="outline" size="sm" onClick={() => setInvoiceImportOpen(true)}>
+              <Search className="mr-2 h-4 w-4" />Scan Invoice
+            </Button>
             <Dialog open={dialogOpen} onOpenChange={(o) => { setDialogOpen(o); if (!o) resetForm(); }}>
               <DialogTrigger asChild>
                 <Button className="w-full sm:w-auto" size="sm" onClick={() => openAddDialog()}><PackagePlus className="mr-2 h-4 w-4" />Receive New Batch</Button>
@@ -795,6 +800,15 @@ const DrugsPage = () => {
           </CardContent>
         </Card>
       </div>
+      <InvoiceBatchImportDialog
+        open={invoiceImportOpen}
+        onOpenChange={setInvoiceImportOpen}
+        inventory={drugs}
+        onSaved={(batchCount) => {
+          void logAudit("Imported inventory invoice", `Added ${batchCount} inventory batch${batchCount === 1 ? "" : "es"} from an invoice.`);
+          void fetchDrugs();
+        }}
+      />
       <Dialog open={movementDialogOpen} onOpenChange={setMovementDialogOpen}>
         <DialogContent className="sm:max-w-md">
           <DialogHeader>

@@ -580,6 +580,13 @@ export type Database = {
         }
         Returns: string
       }
+      add_inventory_batches: {
+        Args: {
+          p_batches: Json
+          p_reason?: string
+        }
+        Returns: string[]
+      }
       record_inventory_stock_change: {
         Args: {
           p_drug_id: string

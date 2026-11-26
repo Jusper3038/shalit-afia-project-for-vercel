@@ -92,6 +92,9 @@ export default defineConfig(({ mode }) => {
           manualChunks(id) {
             if (!id.includes("node_modules")) return;
 
+            if (id.includes("/node_modules/pdfjs-dist/")) return "invoice-pdf";
+            if (id.includes("/node_modules/tesseract.js/") || id.includes("/node_modules/tesseract.js-core/")) return "invoice-ocr";
+
             for (const [chunkName, markers] of Object.entries(vendorChunkGroups)) {
               if (markers.some((marker) => id.includes(marker))) {
                 return chunkName;
