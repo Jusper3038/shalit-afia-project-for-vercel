@@ -39,13 +39,40 @@ const MAX_INVOICE_ROWS = 100;
 
 const normalizeName = (value: string) => value.toLowerCase().trim().replace(/\s+/g, " ");
 
+const normalizeYear = (value: string) => {
+  if (value.length === 4) return value;
+  return `${Number(value) >= 70 ? "19" : "20"}${value}`;
+};
+
+const makeValidDate = (year: string, monthValue: string, dayValue: string) => {
+  const month = Number(monthValue);
+  const day = Number(dayValue);
+  const date = new Date(Date.UTC(Number(year), month - 1, day));
+  if (date.getUTCFullYear() !== Number(year) || date.getUTCMonth() !== month - 1 || date.getUTCDate() !== day) return "";
+  return `${year}-${String(month).padStart(2, "0")}-${String(day).padStart(2, "0")}`;
+};
+
 const parseDate = (value: string) => {
-  const iso = value.match(/\b(20\d{2})[-/.](\d{1,2})[-/.](\d{1,2})\b/);
-  if (iso) return `${iso[1]}-${iso[2].padStart(2, "0")}-${iso[3].padStart(2, "0")}`;
-  const local = value.match(/\b(\d{1,2})[-/.](\d{1,2})[-/.](20\d{2})\b/);
-  if (local) return `${local[3]}-${local[2].padStart(2, "0")}-${local[1].padStart(2, "0")}`;
+  const normalized = value.replace(/[.]/g, "/").trim();
+  const iso = normalized.match(/\b(20\d{2})[-/](\d{1,2})[-/](\d{1,2})\b/);
+  if (iso) return makeValidDate(iso[1], iso[2], iso[3]);
+
+  const monthFirst = normalized.match(/\b(\d{1,2})[-/](\d{1,2})[-/](\d{2}|20\d{2})\b/);
+  if (monthFirst) return makeValidDate(normalizeYear(monthFirst[3]), monthFirst[1], monthFirst[2]);
+
+  // Medicine expiry dates are often printed as MM/YY or MM/YYYY.
+  const monthYear = normalized.match(/\b(\d{1,2})[-/](\d{2}|20\d{2})\b/);
+  if (monthYear) {
+    const year = normalizeYear(monthYear[2]);
+    const month = Number(monthYear[1]);
+    if (month < 1 || month > 12) return "";
+    const lastDay = new Date(Date.UTC(Number(year), month, 0)).getUTCDate();
+    return `${year}-${String(month).padStart(2, "0")}-${String(lastDay).padStart(2, "0")}`;
+  }
   return "";
 };
+
+const DATE_PATTERN = String.raw`(?:20\d{2}[-/.]\d{1,2}[-/.]\d{1,2}|\d{1,2}[-/.]\d{1,2}[-/.](?:20)?\d{2}|\d{1,2}[-/.](?:20)?\d{2})`;
 
 const getInvoiceDate = (text: string) => {
   const lines = text.split(/\r?\n/);
@@ -74,20 +101,31 @@ const parseInvoiceRows = (text: string, inventory: Tables<"drugs">[]): InvoiceBa
     if (sourceLine.length < 8 || skippedLine.test(sourceLine)) continue;
 
     let line = sourceLine;
-    const labeledExpiryMatch = line.match(/(?:exp(?:iry)?\s*(?:date)?\s*[:#-]?\s*)(\d{1,2}[-/.]\d{1,2}[-/.]20\d{2}|20\d{2}[-/.]\d{1,2}[-/.]\d{1,2})/i);
-    const rowDateMatch = line.match(/\b(?:20\d{2}[-/.]\d{1,2}[-/.]\d{1,2}|\d{1,2}[-/.]\d{1,2}[-/.]20\d{2})\b/);
+    const labeledExpiryMatch = line.match(new RegExp(`(?:exp(?:iry)?|best\\s*before|use\\s*before)\\s*(?:date)?\\s*[:#-]?\\s*(${DATE_PATTERN})`, "i"));
+    const rowDateMatch = line.match(new RegExp(`\\b${DATE_PATTERN}\\b`));
     const expiryDate = labeledExpiryMatch
       ? parseDate(labeledExpiryMatch[1])
       : rowDateMatch ? parseDate(rowDateMatch[0]) : "";
     if (labeledExpiryMatch) line = line.replace(labeledExpiryMatch[0], " ");
 
-    const batchMatch = line.match(/(?:batch|lot)\s*(?:no\.?|number|#)?\s*[:#-]?\s*([a-z0-9/-]{3,})/i);
-    const serialNumber = batchMatch?.[1] ?? "";
+    const batchMatch = line.match(/(?:\bbatch\s*(?:(?:n[o0]|no|number|code|id)\.?\s*)?|\blot\s*(?:(?:n[o0]|no|number|code|id)\.?\s*)?|\b[bl]\.?(?:\s*)(?:n[o0]|no|number)\.?\s*)[:#=-]?\s*([a-z0-9][a-z0-9/-]{1,})/i);
+    let serialNumber = batchMatch?.[1] ?? "";
     if (batchMatch) line = line.replace(batchMatch[0], " ");
 
-    line = line.replace(/\b(?:20\d{2}[-/.]\d{1,2}[-/.]\d{1,2}|\d{1,2}[-/.]\d{1,2}[-/.]20\d{2})\b/g, " ");
+    line = line.replace(new RegExp(`\\b${DATE_PATTERN}\\b`, "g"), " ");
     const tokens = line.split(/\s+/).filter(Boolean);
     if (tokens.length < 3) continue;
+
+    // Recover unlabelled lot codes (for example, AB1234), while avoiding
+    // common medicine strengths such as 500mg or 100ml.
+    if (!serialNumber) {
+      const batchCodeIndex = tokens.findIndex((token) =>
+        /^(?=.*[a-z])(?=.*\d)[a-z0-9/-]{4,}$/i.test(token) &&
+        !/(?:mg|mcg|ml|g|iu|%)$/i.test(token) &&
+        (token.match(/\d/g)?.length ?? 0) >= 2
+      );
+      if (batchCodeIndex >= 0) serialNumber = tokens.splice(batchCodeIndex, 1)[0];
+    }
 
     const trailingNumbers: number[] = [];
     while (tokens.length > 0 && /^(?:\d{1,3}(?:,\d{3})+|\d+)(?:\.\d{1,2})?$/.test(tokens[tokens.length - 1])) {
@@ -99,9 +137,8 @@ const parseInvoiceRows = (text: string, inventory: Tables<"drugs">[]): InvoiceBa
     if (trailingNumbers.length < 2) continue;
 
     // Most supplier tables end with quantity, unit cost, and line amount.
-    const hasLineAmount = trailingNumbers.length >= 3;
-    const quantity = hasLineAmount ? trailingNumbers[0] : trailingNumbers[0];
-    const buyingPrice = hasLineAmount ? trailingNumbers[1] : trailingNumbers[1];
+    const quantity = trailingNumbers[0];
+    const buyingPrice = trailingNumbers[1];
     if (!Number.isInteger(quantity) || quantity <= 0 || buyingPrice < 0) continue;
 
     if (tokens.length > 1 && /^\d{1,4}[.)]?$/.test(tokens[0])) tokens.shift();
@@ -113,7 +150,7 @@ const parseInvoiceRows = (text: string, inventory: Tables<"drugs">[]): InvoiceBa
     seen.add(key);
 
     const matched = inventory.find((drug) => normalizeName(drug.name) === normalizeName(name));
-    const purchaseDate = invoiceDate || new Date().toISOString().slice(0, 10);
+    const purchaseDate = invoiceDate || getClinicDayKey(new Date());
     drafts.push({
       id: crypto.randomUUID(),
       selected: true,
@@ -125,7 +162,7 @@ const parseInvoiceRows = (text: string, inventory: Tables<"drugs">[]): InvoiceBa
       selling_price: String(matched?.selling_price ?? buyingPrice),
       stock_quantity: String(quantity),
       low_stock_threshold: String(matched?.low_stock_threshold ?? 10),
-      confidence: serialNumber || expiryDate ? "check" : "review",
+      confidence: !serialNumber || !expiryDate || !matched ? "check" : "review",
       source_line: sourceLine,
     });
     if (drafts.length >= MAX_INVOICE_ROWS) break;
