@@ -17,7 +17,7 @@ import { toast } from "sonner";
 import { Plus, Pencil, Trash2, Download, Search, ListPlus, PackagePlus, History, ChevronDown, ChevronRight } from "lucide-react";
 import type { Tables } from "@/integrations/supabase/types";
 import { getExpiredStockCostLoss, getExpiryLabel, getSellableStockQuantity, isExpiredDrug, isExpiringSoonDrug } from "@/lib/inventory";
-import { readClinicCache, withQueryTimeout, writeClinicCache } from "@/lib/clinic-cache";
+import { readClinicCache, writeClinicCache } from "@/lib/clinic-cache";
 import { DRUG_CATALOG, type DrugCatalogItem } from "@/lib/drug-catalog";
 
 const emptyDrugForm = {
@@ -74,6 +74,7 @@ const DrugsPage = () => {
   } = useAuth();
   const [drugs, setDrugs] = useState<Tables<"drugs">[]>([]);
   const [loading, setLoading] = useState(true);
+  const [inventoryLoadError, setInventoryLoadError] = useState<string | null>(null);
   const [dialogOpen, setDialogOpen] = useState(false);
   const [invoiceImportOpen, setInvoiceImportOpen] = useState(false);
   const [editingDrug, setEditingDrug] = useState<Tables<"drugs"> | null>(null);
@@ -104,19 +105,42 @@ const DrugsPage = () => {
   const highlightTimeoutRef = useRef<number | null>(null);
 
   const fetchDrugs = useCallback(async () => {
-    if (!clinicOwnerId) return;
+    if (!clinicOwnerId) {
+      setLoading(false);
+      setInventoryLoadError("Your clinic could not be identified. Sign out and sign in again, then retry.");
+      return;
+    }
     const cached = readClinicCache<Tables<"drugs">[]>(clinicOwnerId, "drugs");
     if (cached) {
       setDrugs(cached);
       setLoading(false);
     }
-    const { data } = await withQueryTimeout(
-      supabase.from("drugs").select("*").eq("user_id", clinicOwnerId).order("created_at", { ascending: false }),
-      { data: cached ?? [], error: null }
-    );
-    setDrugs(data ?? []);
-    writeClinicCache(clinicOwnerId, "drugs", data ?? []);
-    setLoading(false);
+    setInventoryLoadError(null);
+    const timeoutId = window.setTimeout(() => {
+      setLoading(false);
+      setInventoryLoadError("Inventory is taking longer than expected. You can retry while the page stays open.");
+    }, 5000);
+    try {
+      const { data, error } = await supabase
+        .from("drugs")
+        .select("*")
+        .eq("user_id", clinicOwnerId)
+        .order("created_at", { ascending: false });
+
+      if (error) {
+        setInventoryLoadError(error.message);
+        return;
+      }
+
+      setDrugs(data ?? []);
+      writeClinicCache(clinicOwnerId, "drugs", data ?? []);
+      setInventoryLoadError(null);
+    } catch (error) {
+      setInventoryLoadError(error instanceof Error ? error.message : "Could not load inventory.");
+    } finally {
+      window.clearTimeout(timeoutId);
+      setLoading(false);
+    }
   }, [clinicOwnerId]);
 
   useEffect(() => { void fetchDrugs(); }, [fetchDrugs]);
@@ -675,6 +699,14 @@ const DrugsPage = () => {
 
         <Card>
           <CardContent className="overflow-x-auto p-0">
+            {inventoryLoadError && (
+              <div className="flex flex-wrap items-center justify-between gap-3 border-b p-4" role="alert">
+                <p className="text-sm text-destructive">{inventoryLoadError}</p>
+                <Button type="button" variant="outline" size="sm" onClick={() => void fetchDrugs()}>
+                  Retry inventory
+                </Button>
+              </div>
+            )}
             {loading ? (
               <div className="flex items-center justify-center h-32"><div className="animate-spin rounded-full h-6 w-6 border-b-2 border-primary" /></div>
             ) : drugs.length === 0 ? (

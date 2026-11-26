@@ -6,6 +6,7 @@ import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { AuthProvider } from "@/contexts/AuthContext";
 import ProtectedRoute from "@/components/ProtectedRoute";
+import RouteErrorBoundary from "@/components/RouteErrorBoundary";
 
 const Index = lazy(() => import("./pages/Index"));
 const Login = lazy(() => import("./pages/Login"));
@@ -42,8 +43,9 @@ const App = () => (
       <Sonner />
       <BrowserRouter>
         <AuthProvider>
-          <Suspense fallback={<RouteLoader />}>
-            <Routes>
+          <RouteErrorBoundary>
+            <Suspense fallback={<RouteLoader />}>
+              <Routes>
               <Route path="/" element={<Index />} />
               <Route path="/home" element={<Index keepLandingVisible />} />
               <Route path="/login" element={<Login />} />
@@ -67,8 +69,9 @@ const App = () => (
               <Route path="/users" element={<ProtectedRoute requirePlatformOwner><UsersPage /></ProtectedRoute>} />
               <Route path="/settings" element={<ProtectedRoute requiredApp="settings" requireSensitiveVerification><SettingsPage /></ProtectedRoute>} />
               <Route path="*" element={<NotFound />} />
-            </Routes>
-          </Suspense>
+              </Routes>
+            </Suspense>
+          </RouteErrorBoundary>
         </AuthProvider>
       </BrowserRouter>
     </TooltipProvider>
