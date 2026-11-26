@@ -1,5 +1,27 @@
-const FALLBACK_SUPABASE_URL = "https://fkfjwnzdnsjpyfsvgurk.supabase.co";
-const FALLBACK_SUPABASE_PUBLISHABLE_KEY = "sb_publishable_A0cEjsGuEEiVx4tR9qIQ0Q_i_E4ce-e";
+const EXPECTED_SUPABASE_PROJECT_REF = "feiewilnuxeyuqvyuzxq";
 
-export const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL || FALLBACK_SUPABASE_URL;
-export const SUPABASE_PUBLISHABLE_KEY = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY || FALLBACK_SUPABASE_PUBLISHABLE_KEY;
+const configuredUrl = import.meta.env.VITE_SUPABASE_URL?.trim();
+const configuredPublishableKey = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY?.trim();
+
+if (!configuredUrl || !configuredPublishableKey) {
+  throw new Error(
+    "Supabase is not configured. Set VITE_SUPABASE_URL and VITE_SUPABASE_PUBLISHABLE_KEY for the intended environment.",
+  );
+}
+
+let configuredProjectRef = "";
+try {
+  configuredProjectRef = new URL(configuredUrl).hostname.split(".")[0];
+} catch {
+  throw new Error("VITE_SUPABASE_URL must be a valid Supabase project URL.");
+}
+
+if (configuredProjectRef !== EXPECTED_SUPABASE_PROJECT_REF) {
+  throw new Error(
+    `Wrong Supabase project configured: expected ${EXPECTED_SUPABASE_PROJECT_REF}, received ${configuredProjectRef || "unknown"}. The clinic app must use the live project.`,
+  );
+}
+
+export const SUPABASE_PROJECT_REF = EXPECTED_SUPABASE_PROJECT_REF;
+export const SUPABASE_URL = configuredUrl;
+export const SUPABASE_PUBLISHABLE_KEY = configuredPublishableKey;

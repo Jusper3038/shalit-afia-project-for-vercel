@@ -5,15 +5,17 @@ import { COUNTRY_CODES, normalizePhoneNumber } from "@/lib/phone";
 import TeamUsersSettings from "@/components/TeamUsersSettings";
 import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
+import { SUPABASE_PROJECT_REF } from "@/lib/supabase-config";
 import { logAudit } from "@/lib/audit";
 import { clampPercent } from "@/lib/discounts";
+import { createClinicBackup, downloadClinicBackup } from "@/lib/clinic-backup";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { PasswordInput } from "@/components/ui/password-input";
 import { Label } from "@/components/ui/label";
 import { toast } from "sonner";
-import { Crown, LockKeyhole, ShieldCheck, Tags } from "lucide-react";
+import { Crown, Database, Download, LockKeyhole, ShieldCheck, Tags } from "lucide-react";
 
 const splitPhoneNumber = (value?: string | null) => {
   const phone = value ?? "";
@@ -25,7 +27,7 @@ const splitPhoneNumber = (value?: string | null) => {
 };
 
 const SettingsPage = () => {
-  const { user, profile, role, hasOwnerSecurityPin, isPlatformOwner, claimPlatformOwnerAccess, setOwnerSecurityPin } = useAuth();
+  const { user, profile, role, clinicOwnerId, hasOwnerSecurityPin, isPlatformOwner, claimPlatformOwnerAccess, setOwnerSecurityPin } = useAuth();
   const [canClaimPlatformOwner, setCanClaimPlatformOwner] = useState<boolean | null>(null);
   const [profileName, setProfileName] = useState(profile?.name ?? "");
   const [clinicName, setClinicName] = useState(profile?.clinic_name ?? "");
@@ -42,6 +44,27 @@ const SettingsPage = () => {
   );
   const [savingGuardrail, setSavingGuardrail] = useState(false);
   const [claimingPlatformOwner, setClaimingPlatformOwner] = useState(false);
+  const [creatingBackup, setCreatingBackup] = useState(false);
+
+  const handleDownloadClinicBackup = async () => {
+    if (role !== "admin" || !clinicOwnerId) {
+      toast.error("Only the clinic owner can create a clinic backup.");
+      return;
+    }
+
+    setCreatingBackup(true);
+    try {
+      const backup = await createClinicBackup(clinicOwnerId);
+      downloadClinicBackup(backup, profile?.clinic_name ?? "clinic");
+      const rowCount = Object.values(backup.data).reduce((total, rows) => total + rows.length, 0);
+      await logAudit("Downloaded clinic data backup", `Downloaded a clinic backup containing ${rowCount} records.`);
+      toast.success(`Clinic backup downloaded (${rowCount} records). Store it somewhere separate from this device.`);
+    } catch (error) {
+      toast.error(error instanceof Error ? `Backup failed: ${error.message}` : "Could not create the clinic backup.");
+    } finally {
+      setCreatingBackup(false);
+    }
+  };
 
   useEffect(() => {
     setMaximumDiscountPercentage(String(profile?.minimum_profit_retention_percentage ?? 0));
@@ -182,6 +205,32 @@ const SettingsPage = () => {
         </div>
 
         <div className="grid gap-6 xl:grid-cols-2">
+          {role === "admin" && (
+            <Card className="border-primary/20 xl:col-span-2">
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <Database className="h-5 w-5" />
+                  Clinic Data Backup
+                </CardTitle>
+                <CardDescription>
+                  Download a portable copy of this clinic’s profiles, inventory, patients, sales, payments, history, and store records.
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <p className="text-xs text-muted-foreground">
+                  Connected database: <span className="font-mono font-medium text-foreground">{SUPABASE_PROJECT_REF}</span> (live)
+                </p>
+                <p className="text-sm text-muted-foreground">
+                  This is a manual archive, not an automatic sync or one-click restore. It contains sensitive clinic and patient information, so save it in a secure location separate from this device and limit access. It excludes sign-in credentials, payment-provider secrets, security PIN data, invitation codes, and uploaded Storage files. Use Supabase’s database backups for full-project recovery; those include Auth data, while Storage files need their own copy.
+                </p>
+                <Button type="button" onClick={handleDownloadClinicBackup} disabled={creatingBackup || !clinicOwnerId}>
+                  <Download className="mr-2 h-4 w-4" />
+                  {creatingBackup ? "Preparing backup…" : "Download Clinic Backup"}
+                </Button>
+              </CardContent>
+            </Card>
+          )}
+
           {role === "admin" && (
             <Card className="border-primary/20 xl:col-span-2">
               <CardHeader>

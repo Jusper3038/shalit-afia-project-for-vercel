@@ -13,6 +13,28 @@ const vendorChunkGroups: Record<string, string[]> = {
   icons: ["lucide-react"],
 };
 
+const EXPECTED_SUPABASE_PROJECT_REF = "feiewilnuxeyuqvyuzxq";
+
+const validateSupabaseEnvironment = () => {
+  const supabaseUrl = process.env.VITE_SUPABASE_URL?.trim();
+  const publishableKey = process.env.VITE_SUPABASE_PUBLISHABLE_KEY?.trim();
+
+  if (!supabaseUrl || !publishableKey) {
+    throw new Error("Set VITE_SUPABASE_URL and VITE_SUPABASE_PUBLISHABLE_KEY before starting or building the app.");
+  }
+
+  let projectRef = "";
+  try {
+    projectRef = new URL(supabaseUrl).hostname.split(".")[0];
+  } catch {
+    throw new Error("VITE_SUPABASE_URL must be a valid Supabase project URL.");
+  }
+
+  if (projectRef !== EXPECTED_SUPABASE_PROJECT_REF) {
+    throw new Error(`Refusing to start: expected Supabase project ${EXPECTED_SUPABASE_PROJECT_REF}, received ${projectRef || "unknown"}.`);
+  }
+};
+
 const readRequestBody = (req: IncomingMessage) =>
   new Promise<string>((resolve, reject) => {
     const chunks: Buffer[] = [];
@@ -73,6 +95,7 @@ const localApiPlugin = (): Plugin => ({
 // https://vitejs.dev/config/
 export default defineConfig(({ mode }) => {
   Object.assign(process.env, loadEnv(mode, process.cwd(), ""));
+  validateSupabaseEnvironment();
 
   return {
     server: {
