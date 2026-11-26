@@ -53,6 +53,7 @@ const AppLayout = ({ children }: { children: React.ReactNode }) => {
   const [pharmacyExpanded, setPharmacyExpanded] = useState(false);
   const [ownerGreeting, setOwnerGreeting] = useState<string | null>(null);
   const idleCollapseTimeoutRef = useRef<number | null>(null);
+  const sidebarHoveredRef = useRef(false);
   const visibleNavItems = navItems.filter((item) => {
     if (item.platformOnly) return isPlatformOwner;
     if (item.release && !isAppReleased(item.release)) return false;
@@ -78,10 +79,10 @@ const AppLayout = ({ children }: { children: React.ReactNode }) => {
   const scheduleIdleCollapse = useCallback(() => {
     clearIdleCollapseTimer();
 
-    if (!desktopSidebarOpen) return;
+    if (!desktopSidebarOpen || sidebarHoveredRef.current) return;
 
     idleCollapseTimeoutRef.current = window.setTimeout(() => {
-      setDesktopSidebarOpen(false);
+      if (!sidebarHoveredRef.current) setDesktopSidebarOpen(false);
     }, 10_000);
   }, [clearIdleCollapseTimer, desktopSidebarOpen]);
 
@@ -90,12 +91,27 @@ const AppLayout = ({ children }: { children: React.ReactNode }) => {
   }, [scheduleIdleCollapse]);
 
   const openDesktopSidebar = () => {
+    sidebarHoveredRef.current = false;
     setDesktopSidebarOpen(true);
   };
 
   const closeDesktopSidebar = () => {
     clearIdleCollapseTimer();
     setDesktopSidebarOpen(false);
+  };
+
+  const handleSidebarMouseEnter = () => {
+    sidebarHoveredRef.current = true;
+    clearIdleCollapseTimer();
+    setDesktopSidebarOpen(true);
+  };
+
+  const handleSidebarMouseLeave = () => {
+    sidebarHoveredRef.current = false;
+    clearIdleCollapseTimer();
+    idleCollapseTimeoutRef.current = window.setTimeout(() => {
+      setDesktopSidebarOpen(false);
+    }, 500);
   };
 
   const handlePharmacyClick = () => {
@@ -144,22 +160,6 @@ const AppLayout = ({ children }: { children: React.ReactNode }) => {
 
   return (
     <div className="flex min-h-screen overflow-x-hidden bg-slate-50 text-foreground">
-      {!desktopSidebarOpen && (
-        <button
-          type="button"
-          onClick={openDesktopSidebar}
-          className="group fixed left-0 top-1/2 z-40 hidden h-12 w-9 -translate-y-1/2 items-center justify-center rounded-r-xl border border-l-0 border-white/15 bg-sidebar text-white shadow-[8px_8px_22px_rgba(15,23,42,0.2)] transition-all duration-200 hover:w-12 hover:bg-[#063449] focus:outline-none focus:ring-2 focus:ring-primary/40 lg:flex"
-          aria-label="Show sidebar navigation"
-          title="Show navigation"
-        >
-          <span className="absolute left-0 top-2 h-8 w-1 rounded-r-full bg-cyan-300/80 opacity-80" />
-          <PanelLeftOpen className="h-5 w-5 transition-transform duration-200 group-hover:translate-x-0.5" />
-          <span className="pointer-events-none absolute left-14 top-1/2 hidden -translate-y-1/2 whitespace-nowrap rounded-md border bg-white px-3 py-1.5 text-xs font-semibold text-slate-700 opacity-0 shadow-lg shadow-slate-900/10 transition-opacity duration-200 group-hover:opacity-100 xl:block">
-            Open navigation
-          </span>
-        </button>
-      )}
-
       {/* Mobile overlay */}
       {sidebarOpen && (
         <div className="fixed inset-0 z-40 bg-black/50 lg:hidden" onClick={() => setSidebarOpen(false)} />
@@ -167,26 +167,32 @@ const AppLayout = ({ children }: { children: React.ReactNode }) => {
 
       {/* Sidebar */}
       <aside
-        onMouseMove={handleSidebarInteraction}
+        onMouseEnter={handleSidebarMouseEnter}
+        onMouseLeave={(event) => {
+          if (event.currentTarget.contains(event.relatedTarget as Node | null)) return;
+          handleSidebarMouseLeave();
+        }}
         onMouseDown={handleSidebarInteraction}
         onFocus={handleSidebarInteraction}
-        className={`fixed inset-y-0 left-0 z-50 flex w-72 transform flex-col border-r border-white/10 bg-sidebar text-sidebar-foreground shadow-xl transition-transform duration-300 lg:sticky lg:top-0 lg:h-screen lg:translate-x-0 lg:shadow-[12px_0_28px_rgba(15,23,42,0.12)] ${desktopSidebarOpen ? "lg:flex" : "lg:hidden"} ${
+        className={`fixed inset-y-0 left-0 z-50 flex w-72 transform flex-col border-r border-white/10 bg-sidebar text-sidebar-foreground shadow-xl transition-[width,transform] duration-300 lg:sticky lg:top-0 lg:h-screen lg:translate-x-0 lg:shadow-[12px_0_28px_rgba(15,23,42,0.12)] ${desktopSidebarOpen ? "lg:w-72" : "lg:w-16"} ${
           sidebarOpen ? "translate-x-0" : "-translate-x-full"
         }`}
       >
-        <div className="flex min-h-20 items-center gap-3 border-b border-white/10 bg-white/[0.03] px-5">
-          <div className="min-w-0">
+        <div className={cn("flex min-h-20 items-center gap-3 border-b border-white/10 bg-white/[0.03] px-5", !desktopSidebarOpen && "lg:justify-center lg:px-2")}>
+          {desktopSidebarOpen && <Pill className="hidden h-6 w-6 shrink-0 text-cyan-300 lg:block" />}
+          <div className={cn("min-w-0", !desktopSidebarOpen && "lg:hidden")}>
             <span className="block truncate text-lg font-bold tracking-wide text-white">SHALIT AFIA</span>
             <span className="block truncate text-sm text-sidebar-foreground/70">Clinic operations</span>
           </div>
           <Button
             variant="ghost"
             size="icon"
-            className="ml-auto hidden rounded-md border border-white/10 bg-white/[0.04] text-sidebar-foreground hover:bg-white/10 hover:text-white lg:inline-flex"
-            onClick={closeDesktopSidebar}
-            aria-label="Hide sidebar"
+            className={cn("ml-auto hidden rounded-md border border-white/10 bg-white/[0.04] text-sidebar-foreground hover:bg-white/10 hover:text-white lg:inline-flex", !desktopSidebarOpen && "lg:ml-0")}
+            onClick={() => desktopSidebarOpen ? closeDesktopSidebar() : openDesktopSidebar()}
+            aria-label={desktopSidebarOpen ? "Collapse sidebar to icons" : "Expand sidebar"}
+            title={desktopSidebarOpen ? "Collapse sidebar" : "Expand sidebar"}
           >
-            <PanelLeftClose className="h-5 w-5" />
+            {desktopSidebarOpen ? <PanelLeftClose className="h-5 w-5" /> : <PanelLeftOpen className="h-5 w-5" />}
           </Button>
           <Button variant="ghost" size="icon" className="ml-auto text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground lg:hidden" onClick={() => setSidebarOpen(false)} aria-label="Close menu">
             <X className="h-5 w-5" />
@@ -198,8 +204,8 @@ const AppLayout = ({ children }: { children: React.ReactNode }) => {
             Sign Out
           </Button>
         </div>
-        <nav className="flex flex-1 flex-col gap-1 overflow-y-auto px-4 py-5 [scrollbar-color:rgba(255,255,255,0.36)_transparent] [scrollbar-width:thin]">
-          <p className="px-3 pb-3 pt-1 text-[11px] font-semibold uppercase tracking-[0.22em] text-sidebar-foreground/45">Workspace</p>
+        <nav className={cn("flex flex-1 flex-col gap-1 overflow-y-auto py-5 [scrollbar-color:rgba(255,255,255,0.36)_transparent] [scrollbar-width:thin]", desktopSidebarOpen ? "px-4" : "px-2 lg:px-2")}>
+          <p className={cn("px-3 pb-3 pt-1 text-[11px] font-semibold uppercase tracking-[0.22em] text-sidebar-foreground/45", !desktopSidebarOpen && "lg:hidden")}>Workspace</p>
           {visibleNavItems.map((item) => (
             <NavLink
               key={item.to}
@@ -211,35 +217,41 @@ const AppLayout = ({ children }: { children: React.ReactNode }) => {
               className={({ isActive }) =>
                 cn(
                   "group flex min-h-11 items-center gap-3 rounded-md px-3 py-2 text-sm font-semibold transition-all",
+                  !desktopSidebarOpen && "lg:justify-center lg:px-0",
                   isActive
                     ? "bg-white text-sidebar shadow-sm shadow-black/10"
                     : "text-sidebar-foreground/72 hover:bg-white/[0.08] hover:text-white",
                 )
               }
+              title={item.label}
             >
               <item.icon className="h-4 w-4 shrink-0 transition-transform group-hover:scale-105" />
-              {item.label}
+              <span className={!desktopSidebarOpen ? "lg:hidden" : undefined}>{item.label}</span>
             </NavLink>
           ))}
           {visiblePharmacyNavItems.length > 0 && (
             <div className="space-y-1 pt-5">
-              <p className="px-3 pb-3 text-[11px] font-semibold uppercase tracking-[0.22em] text-sidebar-foreground/45">Care Desk</p>
+              <p className={cn("px-3 pb-3 text-[11px] font-semibold uppercase tracking-[0.22em] text-sidebar-foreground/45", !desktopSidebarOpen && "lg:hidden")}>Care Desk</p>
               <button
                 type="button"
                 onClick={handlePharmacyClick}
                 className={cn(
-                  "flex min-h-11 w-full items-center gap-3 rounded-md px-3 py-2 text-left text-sm font-semibold transition-all",
+                  "relative flex min-h-11 w-full items-center gap-3 rounded-md px-3 py-2 text-left text-sm font-semibold transition-all",
+                  !desktopSidebarOpen && "lg:justify-center lg:px-0",
                   isPharmacyRoute
                     ? "bg-white/[0.12] text-white"
                     : "text-sidebar-foreground/72 hover:bg-white/[0.08] hover:text-white",
                 )}
                 aria-expanded={pharmacyExpanded}
+                aria-label="Pharmacy menu, opens a dropdown of pharmacy pages"
+                title={desktopSidebarOpen ? "Pharmacy pages" : "Pharmacy menu — opens dropdown"}
               >
                 <Pill className="h-4 w-4" />
-                <span className="flex-1">Pharmacy</span>
+                <span className={cn("flex-1", !desktopSidebarOpen && "lg:hidden")}>Pharmacy</span>
                 <ChevronDown
                   className={cn(
-                    "h-4 w-4 transition-transform",
+                    "h-4 w-4 shrink-0 transition-transform",
+                    !desktopSidebarOpen && "absolute bottom-1 right-1 h-3 w-3 text-cyan-300",
                     pharmacyExpanded && "rotate-180",
                   )}
                 />
@@ -257,14 +269,16 @@ const AppLayout = ({ children }: { children: React.ReactNode }) => {
                       className={({ isActive }) =>
                         cn(
                           "flex min-h-10 items-center gap-3 rounded-md px-3 py-2 text-sm font-semibold transition-all",
+                          !desktopSidebarOpen && "lg:justify-center lg:px-0",
                           isActive
                             ? "bg-white text-sidebar shadow-sm shadow-black/10"
                             : "text-sidebar-foreground/65 hover:bg-white/[0.08] hover:text-white",
                         )
                       }
+                      title={item.label}
                     >
                       <item.icon className="h-4 w-4" />
-                      {item.label}
+                      <span className={!desktopSidebarOpen ? "lg:hidden" : undefined}>{item.label}</span>
                     </NavLink>
                   ))}
                 </div>
@@ -285,10 +299,7 @@ const AppLayout = ({ children }: { children: React.ReactNode }) => {
       </aside>
 
       {/* Main content */}
-      <div className={cn(
-        "flex min-w-0 flex-1 flex-col transition-[padding] duration-200",
-        !desktopSidebarOpen && "lg:pl-12",
-      )}>
+      <div className="flex min-w-0 flex-1 flex-col">
         <header className="sticky top-0 z-30 flex min-h-16 items-center gap-2 border-b bg-background/95 px-3 py-3 backdrop-blur sm:gap-4 sm:px-4 lg:px-6">
           <Button variant="ghost" size="icon" className="lg:hidden" onClick={() => setSidebarOpen(true)}>
             <Menu className="h-5 w-5" />
