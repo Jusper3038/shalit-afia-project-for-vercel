@@ -152,9 +152,7 @@ const renderPdfPages = async (file: File, onPage: (page: number, total: number) 
     const canvas = document.createElement("canvas");
     canvas.width = Math.ceil(viewport.width);
     canvas.height = Math.ceil(viewport.height);
-    const context = canvas.getContext("2d");
-    if (!context) throw new Error("Could not prepare this PDF page for reading.");
-    await page.render({ canvasContext: context, viewport }).promise;
+    await page.render({ canvas, viewport }).promise;
     canvases.push(canvas);
   }
   return canvases;
